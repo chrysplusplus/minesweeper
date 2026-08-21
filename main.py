@@ -3,15 +3,13 @@
 import curses
 
 from enum import Enum, auto
+from functools import partial
 from itertools import repeat
 
 import tui
 from util import clamp
 
-class BaseEvent:
-    pass
-
-class QuitEvent(BaseEvent):
+class QuitEvent(tui.BaseEvent):
     pass
 
 class Tile(Enum):
@@ -39,16 +37,13 @@ class MinesweeperApp:
         self.stdwin = stdwin
         self.grid = generate_grid((10, 10), 30)
 
-        # TODO
-        #self.event_queue: list[BaseEvent] = []
-        #self.stdwin.on_post_key = self.on_post_key
+        self.event_handler = tui.EventHandler()
+        self.stdwin.on_post_key = self.event_handler.process
 
-        # TODO
         self.init_gameview()
         self.init_keyhelp()
         self.init_overlay()
         self.init_titlebar()
-        #self.init_statusbar()
         self.init_debug()
 
         self.resize_gameview()
@@ -144,7 +139,9 @@ class MinesweeperApp:
 
         return True
 # }}}
-
+    def on_quit(self, _):# {{{
+        self.stdwin.quit()
+# }}}
     def map_window(self):# {{{
         def on_resize():
             curses.update_lines_cols()
@@ -165,7 +162,10 @@ class MinesweeperApp:
 
         self.stdwin.add_mapping(tui.askey("g"), on_debug_toggle)
 
-        self.stdwin.add_mapping(tui.askey("C-C"), self.stdwin.quit)
+        self.event_handler.bind(QuitEvent, self.on_quit)
+        do_quit = lambda: self.event_handler.enqueue(QuitEvent())
+        self.stdwin.add_mapping(tui.askey("C-C"), do_quit)
+        self.stdwin.add_mapping(tui.askey("q"), do_quit)
 # }}}
 
     def resize_gameview(self):# {{{
@@ -214,6 +214,7 @@ def init_curses(stdscr: curses.window):# {{{
     ATTR_WHITE    = curses.color_pair(6)
     ATTR_YELLOW   = curses.color_pair(7)
 # }}}
+
 def generate_grid(grid_size: tuple[int, int], mines: int) -> TileGrid:# {{{
     height, width = grid_size
     locations = [(x, y) for x in range(width) for y in range(height)]
@@ -227,6 +228,7 @@ def generate_grid(grid_size: tuple[int, int], mines: int) -> TileGrid:# {{{
 
     return grid
 # }}}
+
 def gridlines(grid_size: tuple[int, int]) -> list[str]:# {{{
     width, height = grid_size
     line_format = "{outer_left}" + "{separator}".join(repeat("{tile}", width)) + "{outer_right}"

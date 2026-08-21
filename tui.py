@@ -134,6 +134,61 @@ ChildWindow = tuple[WindowDrawState, PadView | None]
 
 KeyMap = OrderedDict[Key, Callable[[], None]]
 
+class BaseEvent:
+    pass
+
+class EventHandler:
+    """Handler for processing application events"""
+
+    __slots__ = ("callbacks", "queue")
+
+    def __init__(self):# {{{
+        self.callbacks: OrderedDict[type, Callable[[BaseEvent], None]] = OrderedDict()
+        self.queue: list[BaseEvents] = []
+# }}}
+    def bind(self, EventT: type, callback: Callable[[BaseEvent], None]) -> bool:# {{{
+        """Bind event type to callback
+
+        EventT must be a subclass of BaseEvent
+
+        Returns False is type is already bound"""
+        assert issubclass(EventT, BaseEvent)
+        if EventT in self.callbacks: return False
+        self.callbacks[EventT] = callback
+        return True
+# }}}
+    def rebind(self, EventT: type, callback: Callable[[BaseEvent], None]) -> Callable[[BaseEvent], None] | None:# {{{
+        """Force binding event type to callback
+
+        EventT must be a subclass of BaseEvent
+
+        Return previously bound callback or None"""
+        assert issubclass(EventT, BaseEvent)
+        previous_callback: Callable[[BaseEvent], None] | None
+        if EventT in self.callbacks:
+            previous_callback = self.callbacks[EventT]
+            self.callbacks[EventT] = callback
+        else:
+            previous_callback = None
+        return previous_callback
+# }}}
+    def enqueue(self, event: BaseEvent) -> bool:# {{{
+        """Enqueue event"""
+        self.queue.append(event)
+# }}}
+    def process(self):# {{{
+        """Process event queue"""
+        while len(self.queue) > 0:
+            event = self.queue.pop(0)
+            if type(event) not in self.callbacks:
+                # weird scenario where the bound callback got removed before the
+                # event was processed; intention in removing the callback
+                # means ignore this event
+                continue
+            callback = self.callbacks[type(event)]
+            callback(event)
+# }}}
+
 class MainWindow:
     """Permits forwarding arguments via MainWindow.forwarding_args.
 
