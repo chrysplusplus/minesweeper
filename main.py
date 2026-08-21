@@ -67,7 +67,7 @@ class MinesweeperApp:
         self.stdwin.add_child(self.overlay, self.overlay_vw)
 # }}}
     def init_keyhelp(self):# {{{
-        self.keyhelp_win = curses.newwin(1, curses.COLS, curses.LINES - 2, 0)
+        self.keyhelp_win = curses.newwin(1, curses.COLS, curses.LINES - 1, 0)
         self.keyhelp = tui.WindowDrawState(self.keyhelp_win)
         self.keyhelp.on_draw = self.on_keyhelp_draw
         self.stdwin.add_child(self.keyhelp)
@@ -87,8 +87,18 @@ class MinesweeperApp:
 
         self.debug_show = False
         self.debug_vals = {}
-# }}}
 
+        # TODO debug
+        def label_tuple(t, *labels):
+            return ', '.join(
+                    "{label}={val}".format(label = l, val = t[i])
+                    for i, l in enumerate(labels))
+
+        dbg = self.debug_vals
+        dbg["pv_pad"] = lambda: label_tuple(self.game_vw.pad_start, "y", "x")
+        dbg["pv_screen"] = lambda: label_tuple(self.game_vw.desired_screen_start, "y", "x")
+        dbg["pv_view"] = lambda: label_tuple(self.game_vw.desired_view_size, "y", "x")
+# }}}
     def on_game_draw(self, win: curses.window) -> bool:# {{{
         win.erase()
 
@@ -99,9 +109,10 @@ class MinesweeperApp:
         return True
 # }}}
     def on_keyhelp_draw(self, win: curses.window) -> bool:# {{{
-        win.erase()
+        win.mvwin(curses.LINES - 1, 0)
         _, maxx = win.getmaxyx()
-        text = "KEYS: ←↑↓→ or wasd to move; f to place flag; Space or Return to clear"[:maxx + 1]
+        win.erase()
+        text = "KEYS: ←↑↓→/wasd to move; f to place flag; Space/Return to check; q/^C to quit"[:maxx - 1]
         win.addstr(0, 0, text)
         return True
 # }}}
@@ -139,10 +150,7 @@ class MinesweeperApp:
 
         return True
 # }}}
-    def on_quit(self, _):# {{{
-        self.stdwin.quit()
-# }}}
-    def map_window(self):# {{{
+    def map_window(self): #{{{
         def on_resize():
             curses.update_lines_cols()
             self.resize_gameview()
@@ -162,26 +170,25 @@ class MinesweeperApp:
 
         self.stdwin.add_mapping(tui.askey("g"), on_debug_toggle)
 
-        self.event_handler.bind(QuitEvent, self.on_quit)
-        do_quit = lambda: self.event_handler.enqueue(QuitEvent())
-        self.stdwin.add_mapping(tui.askey("C-C"), do_quit)
-        self.stdwin.add_mapping(tui.askey("q"), do_quit)
+        self.event_handler.bind(QuitEvent, lambda _: self.stdwin.quit())
+        on_quit = lambda: self.event_handler.enqueue(QuitEvent())
+        self.stdwin.add_mapping(tui.askey("C-C"), on_quit)
+        self.stdwin.add_mapping(tui.askey("q"), on_quit)
 # }}}
-
     def resize_gameview(self):# {{{
         pv = self.game_vw
         grid_size = self.grid.grid_size
         grid_width, grid_height = grid_size
-        width = clamp(grid_width * 2 + 1, curses.COLS - 3)
-        height = clamp(grid_height * 2 + 1, curses.LINES - 5)
+        width = clamp(grid_width * 4 + 1, curses.COLS - 3)
+        height = clamp(grid_height * 2 + 1, curses.LINES - 4)
         starty = 2
         startx = (curses.COLS - width) // 2
         pv.desired_screen_start = (starty, startx)
-        pv.desired_view_size = (width, height)
+        pv.desired_view_size = (height, width)
 # }}}
 
 ATTR_NORMAL = curses.A_NORMAL
-ATTR_UNDER = curses.A_UNDERLINE
+ATTR_UNDER  = curses.A_UNDERLINE
 
 ATTR_BLUE:      int # initialised by init_curses
 ATTR_CYAN:      int # initialised by init_curses
@@ -231,7 +238,7 @@ def generate_grid(grid_size: tuple[int, int], mines: int) -> TileGrid:# {{{
 
 def gridlines(grid_size: tuple[int, int]) -> list[str]:# {{{
     width, height = grid_size
-    line_format = "{outer_left}" + "{separator}".join(repeat("{tile}", width)) + "{outer_right}"
+    line_format = "{outer_left}" + "{separator}".join(repeat("{tile}" * 3, width)) + "{outer_right}"
 
     from tui import L_ew, L_ns, L_nes, L_nsw, L_esw, L_new, L_nesw, C_es, C_sw, C_nw, C_ne
     line_top = line_format.format(outer_left = C_es, separator = L_esw, tile = L_ew, outer_right = C_sw)
