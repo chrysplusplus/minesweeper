@@ -2,7 +2,7 @@
 
 import curses
 
-from enum import Enum, auto
+from enum import Flag, auto
 from functools import partial
 from itertools import repeat
 
@@ -12,16 +12,23 @@ from util import clamp
 class QuitEvent(tui.BaseEvent):
     pass
 
-class Tile(Enum):
+class Tile(Flag):
     EMPTY = auto()
     MINE  = auto()
     FLAG  = auto()
+    SEEN  = auto()
 
-class TileGrid(list):
-    def __init__(self, grid_size: tuple[int, int], mines: int, *args, **kwargs):# {{{
+class TileGrid:
+    __slots__ = ("_grid", "_grid_size", "_mines")
+
+    def __init__(self, grid: list[Tile], grid_size: tuple[int, int], mines: int):# {{{
+        self._grid: list[Tile] = grid
         self._grid_size = grid_size
         self._mines = mines
-        super().__init__(*args, **kwargs)
+# }}}
+    def __iter__(self):# {{{
+        for i, tile in enumerate(self._grid):
+            yield (divmod(i, self._grid_size[0]), tile)
 # }}}
     @property
     def grid_size(self):# {{{
@@ -30,6 +37,18 @@ class TileGrid(list):
     @property
     def mines(self):# {{{
         return self._mines
+# }}}
+    def get_tile(self, coord) -> Tile:# {{{
+        width, height = self._grid_size
+        x, y = coord
+        assert x >= 0 and x < width and y >= 0 and y < height
+        return self._grid[y * width + x]
+# }}}
+    def set_tile(self, coord: int, tile: Tile):# {{{
+        width, height = self._grid_size
+        x, y = coord
+        assert x >= 0 and x < width and y >= 0 and y < height
+        self._grid[y * width + x] = tile
 # }}}
 
 class MinesweeperApp:
@@ -105,6 +124,10 @@ class MinesweeperApp:
         grid_size = self.grid.grid_size
         width, height = grid_size
         tui.win_addlines(win, gridlines(grid_size))
+
+        for (x, y), tile in self.grid:
+            if Tile.MINE in tile:
+                win.addch(2 * y + 1, 4 * x + 2, 'X')
 
         return True
 # }}}
@@ -229,11 +252,11 @@ def generate_grid(grid_size: tuple[int, int], mines: int) -> TileGrid:# {{{
     from random import shuffle
     shuffle(locations)
 
-    grid = TileGrid(grid_size, mines, [Tile.EMPTY for _ in range(width) for _ in range(height)])
+    grid = [Tile.EMPTY for _ in range(width) for _ in range(height)]
     for minex,miney in locations[:mines]:
         grid[miney * width + minex] = Tile.MINE
 
-    return grid
+    return TileGrid(grid, grid_size, mines)
 # }}}
 
 def gridlines(grid_size: tuple[int, int]) -> list[str]:# {{{
