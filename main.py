@@ -2,6 +2,7 @@
 
 import curses
 
+from dataclasses import dataclass, KW_ONLY
 from enum import Flag, auto
 from functools import partial
 from itertools import repeat
@@ -11,6 +12,13 @@ from util import clamp
 
 class QuitEvent(tui.BaseEvent):
     pass
+
+@dataclass
+class MovementEvent(tui.BaseEvent):
+    _: KW_ONLY
+    x: int = 0
+    y: int = 0
+    relative: bool = True
 
 class Tile(Flag):
     EMPTY = auto()
@@ -51,10 +59,15 @@ class TileGrid:
         self._grid[y * width + x] = tile
 # }}}
 
+def empty_tile_grid(grid_size: tuple[int, int], mines: int) -> TileGrid:# {{{
+    return TileGrid([], grid_size, mines)
+# }}}
+
 class MinesweeperApp:
     def __init__(self, stdwin: tui.MainWindow):# {{{
         self.stdwin = stdwin
-        self.grid = generate_grid((10, 10), 30)
+        self.grid = empty_tile_grid((10, 10), 30)
+        self.selection = (0, 0)
 
         self.event_handler = tui.EventHandler()
         self.stdwin.on_post_key = self.event_handler.process
@@ -70,6 +83,7 @@ class MinesweeperApp:
         self.stdwin.refresh()
 
         self.map_window()
+        self.map_selection()
         self.stdwin.mainloop()
 # }}}
     def init_gameview(self):# {{{
@@ -78,6 +92,8 @@ class MinesweeperApp:
         self.game = tui.WindowDrawState(self.game_win)
         self.game.on_draw = self.on_game_draw
         self.stdwin.add_child(self.game, self.game_vw)
+
+        self.event_handler.bind(MovementEvent, self.on_grid_selection_changed)
 # }}}
     def init_overlay(self):# {{{
         self.overlay_win = curses.newpad(100, 100)
@@ -114,6 +130,7 @@ class MinesweeperApp:
                     for i, l in enumerate(labels))
 
         dbg = self.debug_vals
+        dbg["cursor"] = lambda: label_tuple(self.selection, "y", "x")
         dbg["pv_pad"] = lambda: label_tuple(self.game_vw.pad_start, "y", "x")
         dbg["pv_screen"] = lambda: label_tuple(self.game_vw.desired_screen_start, "y", "x")
         dbg["pv_view"] = lambda: label_tuple(self.game_vw.desired_view_size, "y", "x")
@@ -173,6 +190,21 @@ class MinesweeperApp:
 
         return True
 # }}}
+    def on_grid_selection_changed(self, e: MovementEvent):# {{{
+        newx = e.x
+        newy = e.y
+        if e.relative:
+            x, y = self.selection
+            newx += x
+            newy += y
+
+        width, height = self.grid.grid_size
+        newx = newx % width
+        newy = newy % height
+
+        self.selection = (newx, newy)
+        self.move_cursor_to_grid_selection()
+# }}}
     def map_window(self): #{{{
         def on_resize():
             curses.update_lines_cols()
@@ -198,6 +230,19 @@ class MinesweeperApp:
         self.stdwin.add_mapping(tui.askey("C-C"), on_quit)
         self.stdwin.add_mapping(tui.askey("q"), on_quit)
 # }}}
+    def map_selection(self):# {{{
+        on_up = lambda: self.event_handler.enqueue(MovementEvent(y = -1))
+        self.stdwin.add_mapping(tui.askey("k"), on_up)
+
+        on_down = lambda: self.event_handler.enqueue(MovementEvent(y = 1))
+        self.stdwin.add_mapping(tui.askey("j"), on_down)
+
+        on_left = lambda: self.event_handler.enqueue(MovementEvent(x = -1))
+        self.stdwin.add_mapping(tui.askey("h"), on_left)
+
+        on_right = lambda: self.event_handler.enqueue(MovementEvent(x = 1))
+        self.stdwin.add_mapping(tui.askey("l"), on_right)
+# }}}
     def resize_gameview(self):# {{{
         pv = self.game_vw
         grid_size = self.grid.grid_size
@@ -209,6 +254,8 @@ class MinesweeperApp:
         pv.desired_screen_start = (starty, startx)
         pv.desired_view_size = (height, width)
 # }}}
+    def move_cursor_to_grid_selection(self):
+        ...
 
 ATTR_NORMAL = curses.A_NORMAL
 ATTR_UNDER  = curses.A_UNDERLINE
