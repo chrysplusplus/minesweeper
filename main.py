@@ -33,8 +33,7 @@ class MovementEvent(tui.BaseEvent):
         if self.relative:
             return (fromx + self.x, fromy + self.y)
         else:
-            return (self.x, self.y)
-# }}}
+            return (self.x, self.y) # }}}
 
 class Tile(Flag):
     EMPTY = auto()
@@ -48,36 +47,35 @@ class TileGrid:
     def __init__(self, grid: list[Tile], grid_size: tuple[int, int], mines: int):# {{{
         self._grid: list[Tile] = grid
         self._grid_size = grid_size
-        self._mines = mines
-# }}}
+        self._mines = mines # }}}
+
     def __iter__(self):# {{{
         for i, tile in enumerate(self._grid):
-            yield (divmod(i, self._grid_size[0]), tile)
-# }}}
+            yield (divmod(i, self._grid_size[0]), tile) # }}}
+
     @property
     def grid_size(self):# {{{
-        return self._grid_size
-# }}}
+        return self._grid_size # }}}
+
     @property
     def mines(self):# {{{
-        return self._mines
-# }}}
+        return self._mines # }}}
+
     def get_tile(self, coord) -> Tile:# {{{
         width, height = self._grid_size
         x, y = coord
         assert x >= 0 and x < width and y >= 0 and y < height
-        return self._grid[y * width + x]
-# }}}
+        return self._grid[y * width + x] # }}}
+
     def set_tile(self, coord: int, tile: Tile):# {{{
         width, height = self._grid_size
         x, y = coord
         assert x >= 0 and x < width and y >= 0 and y < height
-        self._grid[y * width + x] = tile
-# }}}
+        self._grid[y * width + x] = tile # }}}
+
 
 def empty_tile_grid(grid_size: tuple[int, int], mines: int) -> TileGrid:# {{{
-    return TileGrid([], grid_size, mines)
-# }}}
+    return TileGrid([], grid_size, mines) # }}}
 
 class DebugPanel:
     def __init__(self, stdwin: tui.MainWindow):# {{{
@@ -90,9 +88,9 @@ class DebugPanel:
 
         self.is_visible = False
         self.update_callback: Callable[[], None] | None = None
-        self.track_map = {}
-# }}}
-    def on_draw(self, win: curses.window) -> bool:
+        self.track_map = {} # }}}
+
+    def on_draw(self, win: curses.window) -> bool:# {{{
         pv = self.padview
         assert same(pv.pad, win)
         win.erase()
@@ -115,35 +113,35 @@ class DebugPanel:
                 break
 
         pv.desired_view_size = (y, w)
-        return True
+        return True# }}}
 
-    def on_update(self):
+    def on_update(self):# {{{
         if self.update_callback is not None: self.update_callback()
-        tui.windraw_refresh(self.drawstate, self.padview)
+        tui.windraw_refresh(self.drawstate, self.padview)# }}}
 
-    def track(self, key: str, value: Any):
-        self.track_map[key] = value
+    def track(self, key: str, value: Any):# {{{
+        self.track_map[key] = value# }}}
 
-    def untrack(self, key: str) -> Any:
-        return self.track_map.pop(key) if key in self.track_map else None
+    def untrack(self, key: str) -> Any:# {{{
+        return self.track_map.pop(key) if key in self.track_map else None# }}}
 
-    def enable(self):
+    def enable(self):# {{{
         self.update_callback = self.stdwin.on_post_key
         self.stdwin.on_post_key = self.on_update
         self.is_visible = True
-        self.stdwin.refresh()
+        self.stdwin.refresh()# }}}
 
-    def disable(self):
+    def disable(self):# {{{
         self.stdwin.on_post_key = self.update_callback
         self.update_callback = None
         self.is_visible = False
-        self.stdwin.refresh()
+        self.stdwin.refresh()# }}}
 
-    def toggle(self):
+    def toggle(self):# {{{
         if self.is_visible:
             self.disable()
         else:
-            self.enable()
+            self.enable()# }}}
 
 class MinesweeperApp:
     def __init__(self, stdwin: tui.MainWindow):# {{{
@@ -166,43 +164,43 @@ class MinesweeperApp:
 
         self.map_window()
         self.map_selection()
-        self.stdwin.mainloop()
-# }}}
+        self.stdwin.mainloop() # }}}
+
     def init_gameview(self):# {{{
         self.game_win = curses.newpad(100, 100)
-        self.game_vw = tui.PadView(self.game_win, (0, 0), (2, 0), (0, 0))
+        self.game_vw = tui.PadView(self.game_win, desired_screen_start = (2, 0))
         self.game = tui.WindowDrawState(self.game_win)
         self.game.on_draw = self.on_game_draw
         self.stdwin.add_child(self.game, self.game_vw)
 
-        self.event_handler.bind(MovementEvent, self.on_grid_selection_changed)
-# }}}
+        self.event_handler.bind(MovementEvent, self.on_grid_selection_changed) # }}}
+
     def init_overlay(self):# {{{
         self.overlay_win = curses.newpad(100, 100)
-        self.overlay_vw = tui.PadView(self.overlay_win, (0, 0), (0, 0), (0, 0))
+        self.overlay_vw = tui.PadView(self.overlay_win)
         self.overlay = tui.WindowDrawState(self.overlay_win)
-        self.stdwin.add_child(self.overlay, self.overlay_vw)
-# }}}
+        self.stdwin.add_child(self.overlay, self.overlay_vw) # }}}
+
     def init_keyhelp(self):# {{{
         self.keyhelp_win = curses.newwin(1, curses.COLS, curses.LINES - 1, 0)
         self.keyhelp = tui.WindowDrawState(self.keyhelp_win)
         self.keyhelp.on_draw = self.on_keyhelp_draw
-        self.stdwin.add_child(self.keyhelp)
-# }}}
+        self.stdwin.add_child(self.keyhelp) # }}}
+
     def init_titlebar(self):# {{{
         self.titlebar_win = curses.newwin(1, curses.COLS, 0, 0)
         self.titlebar = tui.WindowDrawState(self.titlebar_win)
         self.titlebar.on_draw = self.on_titlebar_draw
-        self.stdwin.add_child(self.titlebar)
-    # }}}
+        self.stdwin.add_child(self.titlebar) # }}}
+
     def init_debug(self):# {{{
         self.debug_panel = DebugPanel(self.stdwin)
         self.debug_panel.track("cursor", lambda: self.stdwin.stdcurs)
         self.debug_panel.track("grid_coord", compose2(partial(getattr, self, "selection"), label_xycoords))
         self.debug_panel.track("pv_pad", compose2(partial(getattr, self.game_vw, "pad_start"), label_yxcoords))
         self.debug_panel.track("pv_screen", compose2(partial(getattr, self.game_vw, "desired_screen_start"), label_yxcoords))
-        self.debug_panel.track("pv_view", compose2(partial(getattr, self.game_vw, "desired_view_size"), label_yxcoords))
-# }}}
+        self.debug_panel.track("pv_view", compose2(partial(getattr, self.game_vw, "desired_view_size"), label_yxcoords)) # }}}
+
     def on_game_draw(self, win: curses.window) -> bool:# {{{
         win.erase()
 
@@ -214,30 +212,30 @@ class MinesweeperApp:
             if Tile.MINE in tile:
                 win.addch(2 * y + 1, 4 * x + 2, 'X')
 
-        return True
-# }}}
+        return True # }}}
+
     def on_keyhelp_draw(self, win: curses.window) -> bool:# {{{
         win.mvwin(curses.LINES - 1, 0)
         _, maxx = win.getmaxyx()
         win.erase()
         text = "KEYS: ←↑↓→/wasd to move; f to place flag; Space/Return to check; q/^C to quit"[:maxx - 1]
         win.addstr(0, 0, text)
-        return True
-# }}}
+        return True # }}}
+
     def on_titlebar_draw(self, win: curses.window) -> bool:# {{{
         win.erase()
         _, maxx = win.getmaxyx()
         text = "Minesweeper"[:maxx + 1]
         win.addstr(0, (maxx - len(text)) // 2, text)
-        return True
-# }}}
+        return True # }}}
+
     def on_grid_selection_changed(self, e: MovementEvent):# {{{
         stdwin = self.stdwin
         self.selection = wrap_coords_to_grid(
                 e.get_moved_coords_from(self.selection), self.grid.grid_size)
         stdwin.stdcurs = get_grid_view_screen_cursor(self.game_vw, self.selection)
-        stdwin.move_cursor(stdwin.stdcurs)
-# }}}
+        stdwin.move_cursor(stdwin.stdcurs) # }}}
+
     # TODO refactor callbacks
     def map_window(self): #{{{
         def on_resize():
@@ -270,8 +268,8 @@ class MinesweeperApp:
         self.event_handler.bind(QuitEvent, lambda _: self.stdwin.quit())
         on_quit = lambda: self.event_handler.enqueue(QuitEvent())
         self.stdwin.add_mapping(tui.askey("C-C"), on_quit)
-        self.stdwin.add_mapping(tui.askey("q"), on_quit)
-# }}}
+        self.stdwin.add_mapping(tui.askey("q"), on_quit) # }}}
+
     def map_selection(self):# {{{
         stdwin = self.stdwin
         event_handler = self.event_handler
@@ -282,8 +280,8 @@ class MinesweeperApp:
         stdwin.add_mapping(tui.askey("h"),
                            partial(event_handler.enqueue, MovementEvent(x = -1)))
         stdwin.add_mapping(tui.askey("l"),
-                           partial(event_handler.enqueue, MovementEvent(x = 1)))
-# }}}
+                           partial(event_handler.enqueue, MovementEvent(x = 1))) # }}}
+
     def resize_gameview(self):# {{{
         pv = self.game_vw
         grid_size = self.grid.grid_size
@@ -298,20 +296,18 @@ class MinesweeperApp:
         # TODO check if gameview has focus
         stdwin = self.stdwin
         stdwin.stdcurs = get_grid_view_screen_cursor(self.game_vw, self.selection)
-        stdwin.move_cursor(stdwin.stdcurs)
-# }}}
+        stdwin.move_cursor(stdwin.stdcurs) # }}}
 
 def wrap_coords_to_grid(coords: tuple[int, int], grid_size: tuple[int, int]) -> tuple[int, int]:# {{{
     x, y = coords
     w, h = grid_size
-    return (x % w, y % h)
-# }}}
+    return (x % w, y % h) # }}}
+
 def get_grid_view_screen_cursor(grid_view: tui.PadView, selection_coords: tuple[int, int]) -> tui.Cursor:# {{{
     x, y = selection_coords
     starty, startx = grid_view.desired_screen_start
     pady, padx = grid_view.pad_start
-    return tui.Cursor((starty - pady + 2 * y + 1, startx - padx + 4 * x + 2))
-# }}}
+    return tui.Cursor((starty - pady + 2 * y + 1, startx - padx + 4 * x + 2)) }}}
 
 ATTR_NORMAL = curses.A_NORMAL
 ATTR_UNDER  = curses.A_UNDERLINE
@@ -345,8 +341,7 @@ def init_curses(stdscr: curses.window):# {{{
     ATTR_MAGENTA  = curses.color_pair(4)
     ATTR_RED      = curses.color_pair(5)
     ATTR_WHITE    = curses.color_pair(6)
-    ATTR_YELLOW   = curses.color_pair(7)
-# }}}
+    ATTR_YELLOW   = curses.color_pair(7) # }}}
 
 def generate_grid(grid_size: tuple[int, int], mines: int) -> TileGrid:# {{{
     height, width = grid_size
@@ -359,8 +354,7 @@ def generate_grid(grid_size: tuple[int, int], mines: int) -> TileGrid:# {{{
     for minex,miney in locations[:mines]:
         grid[miney * width + minex] = Tile.MINE
 
-    return TileGrid(grid, grid_size, mines)
-# }}}
+    return TileGrid(grid, grid_size, mines) # }}}
 
 def gridlines(grid_size: tuple[int, int]) -> list[str]:# {{{
     width, height = grid_size
@@ -378,8 +372,7 @@ def gridlines(grid_size: tuple[int, int]) -> list[str]:# {{{
         if y < height - 1:
             lines.append(line_mid)
     lines.append(line_bot)
-    return lines
-# }}}
+    return lines # }}}
 
 def label_yxcoords(coords: tuple[int, int]) -> str:# {{{
     return label_tuple(coords, "y", "x") # }}}
