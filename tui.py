@@ -117,9 +117,9 @@ class Key:
 @dataclass(slots = True)
 class PadView:
     pad: curses.window
-    pad_start: tuple[int,int]
-    desired_screen_start: tuple[int,int]
-    desired_view_size: tuple[int,int]
+    pad_start: tuple[int,int] = (0, 0)
+    desired_screen_start: tuple[int,int] = (0, 0)
+    desired_view_size: tuple[int,int] = (0, 0)
 
 @dataclass(slots = True)
 class WindowDrawState:

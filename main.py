@@ -4,6 +4,7 @@
 TODO
 
 - [ ] Debug updates after any key press
+- [ ] Implement game logic
 """
 
 import curses
@@ -12,9 +13,10 @@ from dataclasses import dataclass, KW_ONLY
 from enum import Flag, auto
 from functools import partial
 from itertools import repeat
+from typing import Any
 
 import tui
-from util import clamp
+from util import clamp, same, label_tuple, compose2
 
 class QuitEvent(tui.BaseEvent):
     pass
@@ -77,6 +79,53 @@ def empty_tile_grid(grid_size: tuple[int, int], mines: int) -> TileGrid:# {{{
     return TileGrid([], grid_size, mines)
 # }}}
 
+class DebugPanel:
+    def __init__(self, stdwin: tui.MainWindow):# {{{
+        self.stdwin = stdwin
+        self.window = curses.newpad(100, 100)
+        self.padview = tui.PadView(self.window) # TODO if works, make changes elsewhere
+        self.drawstate = tui.WindowDrawState(self.window)
+        self.drawstate.on_draw = self.on_draw
+        self.stdwin.add_child(self.drawstate, self.padview)
+
+        self.is_visible = False
+        self.track_map = {}
+# }}}
+    def on_draw(self, win: curses.window) -> bool:
+        pv = self.padview
+        assert same(pv.pad, win)
+        win.erase()
+        if not self.is_visible:
+            pv.desired_view_size = (0, 0)
+            return True
+
+        maxy, maxx = win.getmaxyx()
+        maxx = min(maxx, curses.COLS - 1)
+        win.addstr(0, 0, "Debug", ATTR_WHITE)
+        y = 1
+        w = 6
+        for key, value in self.track_map.items():
+            value = value() if callable(value) else value
+            line = f"{key}: {value}"[:maxx]
+            w = max(w, len(line))
+            win.addstr(y, 0, line, ATTR_WHITE)
+            y += 1
+            if y == maxy:
+                break
+
+        pv.desired_view_size = (y, w)
+        return True
+
+    def track(self, key: str, value: Any):
+        self.track_map[key] = value
+
+    def untrack(self, key: str) -> Any:
+        return self.track_map.pop(key) if key in self.track_map else None
+
+    def toggle_visible(self):
+        # TODO hook into main loop to update after key presses
+        self.is_visible = not self.is_visible
+
 class MinesweeperApp:
     def __init__(self, stdwin: tui.MainWindow):# {{{
         self.stdwin = stdwin
@@ -128,26 +177,12 @@ class MinesweeperApp:
         self.stdwin.add_child(self.titlebar)
     # }}}
     def init_debug(self):# {{{
-        self.debug_win = curses.newpad(100, 100)
-        self.debug_vw = tui.PadView(self.debug_win, (0, 0), (0, 0), (0, 0))
-        self.debug_scr = tui.WindowDrawState(self.debug_win)
-        self.debug_scr.on_draw = self.on_debug_draw
-        self.stdwin.add_child(self.debug_scr, self.debug_vw)
-
-        self.debug_show = False
-        self.debug_vals = {}
-
-        # TODO debug
-        def label_tuple(t, *labels):
-            return ', '.join(
-                    "{label}={val}".format(label = l, val = t[i])
-                    for i, l in enumerate(labels))
-
-        dbg = self.debug_vals
-        dbg["cursor"] = lambda: label_tuple(self.selection, "y", "x")
-        dbg["pv_pad"] = lambda: label_tuple(self.game_vw.pad_start, "y", "x")
-        dbg["pv_screen"] = lambda: label_tuple(self.game_vw.desired_screen_start, "y", "x")
-        dbg["pv_view"] = lambda: label_tuple(self.game_vw.desired_view_size, "y", "x")
+        self.debug_panel = DebugPanel(self.stdwin)
+        self.debug_panel.track("cursor", lambda: self.stdwin.stdcurs)
+        self.debug_panel.track("grid_coord", compose2(partial(getattr, self, "selection"), label_xycoords))
+        self.debug_panel.track("pv_pad", compose2(partial(getattr, self.game_vw, "pad_start"), label_yxcoords))
+        self.debug_panel.track("pv_screen", compose2(partial(getattr, self.game_vw, "desired_screen_start"), label_yxcoords))
+        self.debug_panel.track("pv_view", compose2(partial(getattr, self.game_vw, "desired_view_size"), label_yxcoords))
 # }}}
     def on_game_draw(self, win: curses.window) -> bool:# {{{
         win.erase()
@@ -177,33 +212,6 @@ class MinesweeperApp:
         win.addstr(0, (maxx - len(text)) // 2, text)
         return True
 # }}}
-    def on_debug_draw(self, win: curses.window) -> bool:# {{{
-        pv = self.debug_vw
-        assert id(pv.pad) == id(win)
-        win.erase()
-        if self.debug_show:
-            maxy, maxx = win.getmaxyx()
-            maxx = min(maxx, curses.COLS - 1)
-            assert maxy > 2
-            win.addstr(0, 0, "Debug", ATTR_WHITE)
-            y = 1
-            w = 6
-            for key, value in self.debug_vals.items():
-                value = value() if callable(value) else value
-                line = f"{key}: {value}"[:maxx]
-                w = max(w, len(line))
-                win.addstr(y, 0, line, ATTR_WHITE)
-                y += 1
-                if y == maxy:
-                    break
-
-            pv.desired_view_size = (y, w)
-
-        else:
-            pv.desired_view_size = (0, 0)
-
-        return True
-# }}}
     def on_grid_selection_changed(self, e: MovementEvent):# {{{
         stdwin = self.stdwin
         self.selection = wrap_coords_to_grid(
@@ -227,7 +235,7 @@ class MinesweeperApp:
         self.stdwin.add_mapping(tui.askey("C-L"), on_reset)
 
         def on_debug_toggle():
-            self.debug_show = not self.debug_show
+            self.debug_panel.toggle_visible()
             self.stdwin.refresh()
 
         self.stdwin.add_mapping(tui.askey("g"), on_debug_toggle)
@@ -345,6 +353,12 @@ def gridlines(grid_size: tuple[int, int]) -> list[str]:# {{{
     lines.append(line_bot)
     return lines
 # }}}
+
+def label_yxcoords(coords: tuple[int, int]) -> str:# {{{
+    return label_tuple(coords, "y", "x") # }}}
+
+def label_xycoords(coords: tuple[int, int]) -> str:# {{{
+    return label_tuple(coords, "x", "y") # }}}
 
 if __name__ == "__main__":
     curses.wrapper(tui.start_curses, init_curses, MinesweeperApp)

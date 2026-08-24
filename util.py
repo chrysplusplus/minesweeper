@@ -19,6 +19,7 @@ class Invoke:
         return Invoke(make_then(self._wrapped, then._wrapped))
 
 T = TypeVar("T")
+U = TypeVar("U")
 
 def make_then(fn: Callable[[], Any], then_fn: Callable[[], T]) -> Callable[[], T]:# {{{
     def result() -> T:
@@ -43,5 +44,15 @@ def pad_text(text: str, padding: int) -> str:# {{{
 def set_cursor_shape():# {{{
     print("\033[2 q", end = '')
 # }}}
+def same(this: Any, that: Any) -> bool:# {{{
+    return id(this) == id(that) # }}}
+
+def label_tuple(t: tuple, *labels: str) -> str:# {{{
+    return ', '.join(
+            "{l}={v}".format(l = l, v = t[i])
+            for i, l in enumerate(labels)) # }}}
+
+def compose2(fn0: Callable[[Any], T], fn1: Callable[[T], U]) -> Callable[[Any], U]:
+    return lambda *args, **kwargs: fn1(fn0(*args, **kwargs))
 
 # vim: foldmethod=marker
