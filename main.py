@@ -3,7 +3,7 @@
 """
 TODO
 
-- [ ] Debug updates after any key press
+- [X] Debug updates after any key press
 - [ ] Implement game logic
 """
 
@@ -83,12 +83,13 @@ class DebugPanel:
     def __init__(self, stdwin: tui.MainWindow):# {{{
         self.stdwin = stdwin
         self.window = curses.newpad(100, 100)
-        self.padview = tui.PadView(self.window) # TODO if works, make changes elsewhere
+        self.padview = tui.PadView(self.window)
         self.drawstate = tui.WindowDrawState(self.window)
         self.drawstate.on_draw = self.on_draw
         self.stdwin.add_child(self.drawstate, self.padview)
 
         self.is_visible = False
+        self.update_callback: Callable[[], None] | None = None
         self.track_map = {}
 # }}}
     def on_draw(self, win: curses.window) -> bool:
@@ -116,15 +117,33 @@ class DebugPanel:
         pv.desired_view_size = (y, w)
         return True
 
+    def on_update(self):
+        if self.update_callback is not None: self.update_callback()
+        tui.windraw_refresh(self.drawstate, self.padview)
+
     def track(self, key: str, value: Any):
         self.track_map[key] = value
 
     def untrack(self, key: str) -> Any:
         return self.track_map.pop(key) if key in self.track_map else None
 
-    def toggle_visible(self):
-        # TODO hook into main loop to update after key presses
-        self.is_visible = not self.is_visible
+    def enable(self):
+        self.update_callback = self.stdwin.on_post_key
+        self.stdwin.on_post_key = self.on_update
+        self.is_visible = True
+        self.stdwin.refresh()
+
+    def disable(self):
+        self.stdwin.on_post_key = self.update_callback
+        self.update_callback = None
+        self.is_visible = False
+        self.stdwin.refresh()
+
+    def toggle(self):
+        if self.is_visible:
+            self.disable()
+        else:
+            self.enable()
 
 class MinesweeperApp:
     def __init__(self, stdwin: tui.MainWindow):# {{{
@@ -234,11 +253,7 @@ class MinesweeperApp:
 
         self.stdwin.add_mapping(tui.askey("C-L"), on_reset)
 
-        def on_debug_toggle():
-            self.debug_panel.toggle_visible()
-            self.stdwin.refresh()
-
-        self.stdwin.add_mapping(tui.askey("g"), on_debug_toggle)
+        self.stdwin.add_mapping(tui.askey("g"), self.debug_panel.toggle)
 
         def on_breakpoint():
             self.stdwin.stdscr.move(0, 0)
