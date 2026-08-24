@@ -240,6 +240,18 @@ class MinesweeperApp:
 
         self.stdwin.add_mapping(tui.askey("g"), on_debug_toggle)
 
+        def on_breakpoint():
+            self.stdwin.stdscr.move(0, 0)
+            self.stdwin.stdscr.clrtobot()
+            self.stdwin.stdscr.refresh()
+            curses.reset_shell_mode()
+            breakpoint()
+            curses.reset_prog_mode()
+            self.stdwin.stdscr.clear()
+            self.stdwin.refresh()
+
+        self.stdwin.add_mapping(tui.askey("b"), on_breakpoint)
+
         self.event_handler.bind(QuitEvent, lambda _: self.stdwin.quit())
         on_quit = lambda: self.event_handler.enqueue(QuitEvent())
         self.stdwin.add_mapping(tui.askey("C-C"), on_quit)
