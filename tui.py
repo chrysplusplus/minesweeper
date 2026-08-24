@@ -226,8 +226,11 @@ class MainWindow:
         for child in self.children:
             windraw_noutrefresh(*child)
 
-        win_move_cursor(self.stdscr, self.stdcurs)
+        self.move_cursor(self.stdcurs)
         return False
+
+    def move_cursor(self, cursor: Cursor):
+        win_move_cursor(self._stdscr, cursor)
 
     def add_child(self, windraw: WindowDrawState, pv: PadView | None = None):
         self.children.append((windraw, pv))

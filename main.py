@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
 
+"""
+TODO
+
+- [ ] Debug updates after any key press
+"""
+
 import curses
 
 from dataclasses import dataclass, KW_ONLY
@@ -19,6 +25,14 @@ class MovementEvent(tui.BaseEvent):
     x: int = 0
     y: int = 0
     relative: bool = True
+
+    def get_moved_coords_from(self, from_coords: tuple[int, int]) -> tuple[int, int]:# {{{
+        fromx, fromy = from_coords
+        if self.relative:
+            return (fromx + self.x, fromy + self.y)
+        else:
+            return (self.x, self.y)
+# }}}
 
 class Tile(Flag):
     EMPTY = auto()
@@ -78,8 +92,8 @@ class MinesweeperApp:
         self.init_titlebar()
         self.init_debug()
 
-        self.resize_gameview()
         self.stdwin.stdcurs.cursor = (-1, -1)
+        self.resize_gameview()
         self.stdwin.refresh()
 
         self.map_window()
@@ -191,20 +205,13 @@ class MinesweeperApp:
         return True
 # }}}
     def on_grid_selection_changed(self, e: MovementEvent):# {{{
-        newx = e.x
-        newy = e.y
-        if e.relative:
-            x, y = self.selection
-            newx += x
-            newy += y
-
-        width, height = self.grid.grid_size
-        newx = newx % width
-        newy = newy % height
-
-        self.selection = (newx, newy)
-        self.move_cursor_to_grid_selection()
+        stdwin = self.stdwin
+        self.selection = wrap_coords_to_grid(
+                e.get_moved_coords_from(self.selection), self.grid.grid_size)
+        stdwin.stdcurs = get_grid_view_screen_cursor(self.game_vw, self.selection)
+        stdwin.move_cursor(stdwin.stdcurs)
 # }}}
+    # TODO refactor callbacks
     def map_window(self): #{{{
         def on_resize():
             curses.update_lines_cols()
@@ -231,17 +238,16 @@ class MinesweeperApp:
         self.stdwin.add_mapping(tui.askey("q"), on_quit)
 # }}}
     def map_selection(self):# {{{
-        on_up = lambda: self.event_handler.enqueue(MovementEvent(y = -1))
-        self.stdwin.add_mapping(tui.askey("k"), on_up)
-
-        on_down = lambda: self.event_handler.enqueue(MovementEvent(y = 1))
-        self.stdwin.add_mapping(tui.askey("j"), on_down)
-
-        on_left = lambda: self.event_handler.enqueue(MovementEvent(x = -1))
-        self.stdwin.add_mapping(tui.askey("h"), on_left)
-
-        on_right = lambda: self.event_handler.enqueue(MovementEvent(x = 1))
-        self.stdwin.add_mapping(tui.askey("l"), on_right)
+        stdwin = self.stdwin
+        event_handler = self.event_handler
+        stdwin.add_mapping(tui.askey("k"),
+                           partial(event_handler.enqueue, MovementEvent(y = -1)))
+        stdwin.add_mapping(tui.askey("j"),
+                           partial(event_handler.enqueue, MovementEvent(y = 1)))
+        stdwin.add_mapping(tui.askey("h"),
+                           partial(event_handler.enqueue, MovementEvent(x = -1)))
+        stdwin.add_mapping(tui.askey("l"),
+                           partial(event_handler.enqueue, MovementEvent(x = 1)))
 # }}}
     def resize_gameview(self):# {{{
         pv = self.game_vw
@@ -253,9 +259,24 @@ class MinesweeperApp:
         startx = (curses.COLS - width) // 2
         pv.desired_screen_start = (starty, startx)
         pv.desired_view_size = (height, width)
+
+        # TODO check if gameview has focus
+        stdwin = self.stdwin
+        stdwin.stdcurs = get_grid_view_screen_cursor(self.game_vw, self.selection)
+        stdwin.move_cursor(stdwin.stdcurs)
 # }}}
-    def move_cursor_to_grid_selection(self):
-        ...
+
+def wrap_coords_to_grid(coords: tuple[int, int], grid_size: tuple[int, int]) -> tuple[int, int]:# {{{
+    x, y = coords
+    w, h = grid_size
+    return (x % w, y % h)
+# }}}
+def get_grid_view_screen_cursor(grid_view: tui.PadView, selection_coords: tuple[int, int]) -> tui.Cursor:# {{{
+    x, y = selection_coords
+    starty, startx = grid_view.desired_screen_start
+    pady, padx = grid_view.pad_start
+    return tui.Cursor((starty - pady + 2 * y + 1, startx - padx + 4 * x + 2))
+# }}}
 
 ATTR_NORMAL = curses.A_NORMAL
 ATTR_UNDER  = curses.A_UNDERLINE
