@@ -203,9 +203,10 @@ class GameView:
         width, height = grid_size
         tui.win_addlines(win, gridlines(grid_size))
 
-        for coords, tile in self.grid:
-            if Tile.MINE in tile:
-                win.addch(*scale_grid_coords_to_screen_offset(coords), 'X')
+        for coords, _ in self.grid:
+            symbol = get_symbol_for_coord_from(self.grid, coords)
+            if symbol is not None:
+                win.addch(*scale_grid_coords_to_screen_offset(coords), symbol)
 
         return True# }}}
 
@@ -221,9 +222,15 @@ class GameView:
         """Callback for activating current selection"""
         raise NotImplementedError
 
-    def on_flag(self, _):
+    def on_flag(self, _):# {{{
         """Callback for toggling flag at the current grid selection"""
-        raise NotImplementedError
+        tile = self.grid.get_tile(self.selection)
+        if Tile.SEEN in tile:
+            return
+
+        tile ^= Tile.FLAG
+        self.grid.set_tile(self.selection, tile)
+        self.update_tile_display(self.selection)# }}}
 
     def bind_events(self):# {{{
         """Bind game events"""
@@ -248,6 +255,17 @@ class GameView:
         stdwin = self.stdwin
         stdwin.stdcurs = get_grid_view_screen_cursor(self.padview, self.selection)
         stdwin.move_cursor(stdwin.stdcurs)# }}}
+
+    def update_tile_display(self, coords: tuple[int, int]):# {{{
+        """Update the specified grid coordinate in the window"""
+        w, h = self.grid.grid_size
+        x, y = coords
+        assert 0 <= x < w and 0 <= y < h
+        symbol = get_symbol_for_coord_from(self.grid, coords)
+        symbol = ' ' if symbol is None else symbol
+        self.window.addch(*scale_grid_coords_to_screen_offset(coords), symbol)
+        self.window.refresh(*tui.padview_clamp(self.padview))
+        self.stdwin.move_cursor(self.stdwin.stdcurs)# }}}
 
     def map_game_controls(self):# {{{
         """Map keys for game controls"""
@@ -463,6 +481,19 @@ def label_yxcoords(coords: tuple[int, int]) -> str:# {{{
 def label_xycoords(coords: tuple[int, int]) -> str:# {{{
     """Format a string with coordinates in x-y order"""
     return label_tuple(coords, "x", "y") # }}}
+
+def get_symbol_for_coord_from(grid: TileGrid, coords: tuple[int, int]) -> str | None:# {{{
+    """Determine display symbol for grid coordinates"""
+    tile = grid.get_tile(coords)
+    symbol: str | None = None
+    if Tile.FLAG in tile:
+        symbol = 'f'
+    elif Tile.SEEN not in tile:
+        symbol = None
+    elif Tile.MINE in tile:
+        symbol = 'x'
+
+    return symbol# }}}
 
 def wrap_coords_to_grid(# {{{
         coords: tuple[int, int], grid_size: tuple[int, int]) -> tuple[int, int]:
