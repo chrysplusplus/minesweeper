@@ -12,7 +12,7 @@ TODO
 
 import curses
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, KW_ONLY
 from enum import Flag, auto
 from functools import partial
@@ -97,6 +97,14 @@ class TileGrid:
         x, y = coord
         assert width > x >= 0 and height > y >= 0
         self._grid[y * width + x] = tile # }}}
+
+    def get_maybe_tile(self, coord: tuple[int, int]) -> Tile | None:# {{{
+        """Get tile at coordinate if one exists there"""
+        width, height = self._grid_size
+        x, y = coord
+        return self._grid[y * width + x] \
+                if width > x >= 0 and height > y >= 0 \
+                else None# }}}
 
 class DebugPanel:
     """Debug window that can override MainWindow on_post_key to update on every
@@ -188,7 +196,8 @@ class GameView:
         self.event_handler = event_handler
 
         self.selection = (0, 0)
-        self.grid = empty_tile_grid((10, 10), 30)
+        # TODO implement opening mercy (no mines around the first tile selected)
+        self.grid = generate_grid((10, 10), 30)
 
         self.window = curses.newpad(100, 100)
         self.padview = tui.PadView(self.window, desired_screen_start = (2, 0))
@@ -220,7 +229,15 @@ class GameView:
 
     def on_select(self, _):
         """Callback for activating current selection"""
-        raise NotImplementedError
+        tile = self.grid.get_tile(self.selection)
+        if Tile.SEEN in tile:
+            return
+        if Tile.FLAG in tile:
+            return
+
+        tile ^= Tile.SEEN
+        self.grid.set_tile(self.selection, tile)
+        self.update_tile_display(self.selection)
 
     def on_flag(self, _):# {{{
         """Callback for toggling flag at the current grid selection"""
@@ -482,6 +499,18 @@ def label_xycoords(coords: tuple[int, int]) -> str:# {{{
     """Format a string with coordinates in x-y order"""
     return label_tuple(coords, "x", "y") # }}}
 
+def iter_grid_neighbours(grid: TileGrid, coords: tuple[int, int]) -> Iterable[Tile]:# {{{
+    """Return an iterator of neighbouring tiles to specfied grid coordinates"""
+    thisx, thisy = coords
+    for y in (-1, 0, 1):
+        for x in (-1, 0, 1):
+            if y == 0 and x == 0:
+                continue
+            neighbour = grid.get_maybe_tile((thisx + x, thisy + y))
+            if neighbour is None:
+                continue
+            yield neighbour# }}}
+
 def get_symbol_for_coord_from(grid: TileGrid, coords: tuple[int, int]) -> str | None:# {{{
     """Determine display symbol for grid coordinates"""
     tile = grid.get_tile(coords)
@@ -492,6 +521,10 @@ def get_symbol_for_coord_from(grid: TileGrid, coords: tuple[int, int]) -> str | 
         symbol = None
     elif Tile.MINE in tile:
         symbol = 'x'
+    else:
+        n_neighbouring_mines = sum(1 if Tile.MINE in t else 0
+                                   for t in iter_grid_neighbours(grid, coords))
+        symbol = '□' if n_neighbouring_mines == 0 else str(n_neighbouring_mines)
 
     return symbol# }}}
 
