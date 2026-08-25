@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 
-"""
+"""Main module for Minesweeper TUI game
+
+Author: chrysplusplus
+
 TODO
 
 - [X] Debug updates after any key press
@@ -191,9 +194,9 @@ class GameView:
         width, height = grid_size
         tui.win_addlines(win, gridlines(grid_size))
 
-        for (x, y), tile in self.grid:
+        for coords, tile in self.grid:
             if Tile.MINE in tile:
-                win.addch(2 * y + 1, 4 * x + 2, 'X') # TODO refactor grid coords scaling
+                win.addch(*scale_grid_coords_to_screen_offset(coords), 'X')
 
         return True# }}}
 
@@ -207,9 +210,10 @@ class GameView:
 
     def resize(self):# {{{
         """Resize the window view to fill the available space"""
-        width, height = self.grid.grid_size
-        width = clamp(width * 4 + 1, curses.COLS - 3)
-        height = clamp(height * 2 + 1, curses.LINES - 4)
+        height, width = scale_grid_coords_to_screen_offset(self.grid.grid_size)
+        width = width - 1
+        width = clamp(width, curses.COLS - 3)
+        height = clamp(height, curses.LINES - 4)
         starty = 2
         startx = (curses.COLS - width) // 2
         self.padview.desired_screen_start = (starty, startx)
@@ -273,6 +277,8 @@ class MinesweeperApp:
 
         self.stdwin.add_mapping(tui.askey("g"), self.debug_panel.toggle)
 
+        # NOTE causes issue with resizing after breakpoint is triggered
+        # likely due to switching modes without them being correctly set up
         def on_breakpoint():
             self.stdwin.stdscr.move(0, 0)
             self.stdwin.stdscr.clrtobot()
@@ -314,21 +320,6 @@ class MinesweeperApp:
             partial(getattr, self.gameview.padview, "desired_screen_start"), label_yxcoords))
         self.debug_panel.track("pv_view", compose2(
             partial(getattr, self.gameview.padview, "desired_view_size"), label_yxcoords)) # }}}
-
-def wrap_coords_to_grid(
-        coords: tuple[int, int], grid_size: tuple[int, int]) -> tuple[int, int]:# {{{
-    """Calculate coordinates wrapped inside a grid"""
-    x, y = coords
-    w, h = grid_size
-    return (x % w, y % h) # }}}
-
-def get_grid_view_screen_cursor(
-        grid_view: tui.PadView, selection_coords: tuple[int, int]) -> tui.Cursor:# {{{
-    """Calculate screen coordinates for a given coordinate in a grid"""
-    x, y = selection_coords
-    starty, startx = grid_view.desired_screen_start
-    pady, padx = grid_view.pad_start
-    return tui.Cursor((starty - pady + 2 * y + 1, startx - padx + 4 * x + 2))# }}}
 
 ATTR_NORMAL = curses.A_NORMAL
 ATTR_UNDER  = curses.A_UNDERLINE
@@ -412,6 +403,26 @@ def label_yxcoords(coords: tuple[int, int]) -> str:# {{{
 def label_xycoords(coords: tuple[int, int]) -> str:# {{{
     """Format a string with coordinates in x-y order"""
     return label_tuple(coords, "x", "y") # }}}
+
+def wrap_coords_to_grid(# {{{
+        coords: tuple[int, int], grid_size: tuple[int, int]) -> tuple[int, int]:
+    """Calculate coordinates wrapped inside a grid"""
+    x, y = coords
+    w, h = grid_size
+    return (x % w, y % h) # }}}
+
+def scale_grid_coords_to_screen_offset(grid_coords: tuple[int, int]) -> tuple[int, int]:# {{{
+    """Scale grid coordinates to offset from the origin of the grid window"""
+    x, y = grid_coords
+    return (2 * y + 1, 4 * x + 2)# }}}
+
+def get_grid_view_screen_cursor(# {{{
+        grid_view: tui.PadView, selection_coords: tuple[int, int]) -> tui.Cursor:
+    """Calculate screen coordinates for a given coordinate in a grid"""
+    y, x = scale_grid_coords_to_screen_offset(selection_coords)
+    starty, startx = grid_view.desired_screen_start
+    pady, padx = grid_view.pad_start
+    return tui.Cursor((starty - pady + y, startx - padx + x))# }}}
 
 def key_instruction_bar(stdwin: tui.MainWindow, event_handler: tui.EventHandler) -> TextWindow:# {{{
     """Object for drawing key instructions"""
