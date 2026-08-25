@@ -84,14 +84,14 @@ class TileGrid:
         """Number of mines in the grid, read-only"""
         return self._mines # }}}
 
-    def get_tile(self, coord) -> Tile:# {{{
+    def get_tile(self, coord: tuple[int, int]) -> Tile:# {{{
         """Get tile at coordinate"""
         width, height = self._grid_size
         x, y = coord
         assert width > x >= 0 and height > y >= 0
         return self._grid[y * width + x] # }}}
 
-    def set_tile(self, coord: int, tile: Tile):# {{{
+    def set_tile(self, coord: tuple[int, int], tile: Tile):# {{{
         """Set tile at coordinate"""
         width, height = self._grid_size
         x, y = coord
