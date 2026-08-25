@@ -57,8 +57,12 @@ def label_tuple(t: tuple, *labels: str) -> str:# {{{
     """Format a string with labelled elements of a tuple"""
     return ', '.join(f"{l}={t[i]}" for i, l in enumerate(labels)) # }}}
 
-def compose2(fn0: Callable[[Any], T], fn1: Callable[[T], U]) -> Callable[[Any], U]:
+def compose2(fn0: Callable[[Any], T], fn1: Callable[[T], U]) -> Callable[[Any], U]:# {{{
     """Return the composition of two functions"""
-    return lambda *args, **kwargs: fn1(fn0(*args, **kwargs))
+    return lambda *args, **kwargs: fn1(fn0(*args, **kwargs))# }}}
+
+def transpose_2d(l: list[list[T]]) -> list[list[T]]:
+    """Transpose list of lists"""
+    return [list(inner) for inner in zip(*l)]
 
 # vim: foldmethod=marker

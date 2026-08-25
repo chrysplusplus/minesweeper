@@ -7,6 +7,7 @@ Author: chrysplusplus
 TODO
 
 - [X] Debug updates after any key press
+- [ ] Ensure game padview is large enough for the grid
 - [ ] Implement game logic
 """
 
@@ -16,13 +17,14 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, KW_ONLY
 from enum import Flag, auto
 from functools import partial
-from itertools import repeat
+from itertools import repeat, pairwise
 from random import shuffle
 from typing import Any
 
 import tui
-from tui import L_ew, L_ns, L_nes, L_nsw, L_esw, L_new, L_nesw, C_es, C_sw, C_nw, C_ne
-from util import clamp, same, label_tuple, compose2
+from tui import L_ew, L_ns, L_es, L_sw, L_ne, L_nw, L_nes, L_nsw, L_esw, L_new, L_nesw, C_es,\
+        C_sw, C_nw, C_ne
+from util import clamp, same, label_tuple, compose2, transpose_2d
 
 @dataclass(slots = True)
 class QuitEvent(tui.BaseEvent):
@@ -224,9 +226,7 @@ class GameView:
     def on_draw(self, win: curses.window) -> bool:# {{{
         """Callback for drawing"""
         win.erase()
-        grid_size = self.grid.grid_size
-        width, height = grid_size
-        tui.win_addlines(win, gridlines(grid_size))
+        tui.win_addlines(win, gridlines(self.grid))
 
         for coords, _ in self.grid:
             symbol = get_symbol_for_coord_from(self.grid, coords)
@@ -250,7 +250,8 @@ class GameView:
                     *iter_3x3_area_coords(self.grid.grid_size, self.selection))
 
         self._reveal_tile_at(self.selection)
-        self.refresh()# }}}
+        tui.windraw_refresh(self.drawstate, self.padview)
+        self.stdwin.move_cursor(self.stdwin.stdcurs)# }}}
 
     def on_flag(self, _):# {{{
         """Callback for toggling flag at the current grid selection"""
@@ -347,7 +348,7 @@ class MinesweeperApp:
         self.event_handler = tui.EventHandler()
         self.stdwin.on_post_key = self.event_handler.process
 
-        self.gameview = GameView(self.stdwin, self.event_handler, empty_tile_grid((10, 10), 30))
+        self.gameview = GameView(self.stdwin, self.event_handler, empty_tile_grid((10, 10), 15))
         self.keyhelp = key_instruction_bar(self.stdwin, self.event_handler)
         self.overlay = overlay(self.stdwin, self.event_handler)
         self.titlebar = titlebar(self.stdwin, self.event_handler)
@@ -492,9 +493,25 @@ def empty_tile_grid(grid_size: tuple[int, int], mines: int) -> TileGrid:# {{{
     """Create an empty grid"""
     return TileGrid([], grid_size, mines) # }}}
 
-def gridlines(grid_size: tuple[int, int]) -> list[str]:# {{{
-    """Return a list of strings corresponding to the text lines representing a
-    grid of a specified size"""
+def iter_conds_from_tiles(tiles: Iterable[Tile]) -> Iterable[bool]:
+    """Return an iterator of barrier conditions for a collection of tiles"""
+    for first_tile, second_tile in pairwise(tiles):
+        yield False if Tile.SEEN in first_tile and Tile.SEEN in second_tile else True
+
+def iter_elems_from_grid_y(grid: TileGrid, y: int) -> Iterable[str]:
+    """Return gridline elements for the specified y-coordinate in grid"""
+    width, _ = grid.grid_size
+    conds = iter_conds_from_tiles(grid.get_tile((x, y)) for x in range(width))
+    return (L_ns if cond else " " for cond in conds)
+
+def iter_elems_from_grid_x(grid: TileGrid, x: int) -> Iterable[str]:
+    """Return gridline elements for the specified x-coordinate in grid"""
+    _, height = grid.grid_size
+    conds = iter_conds_from_tiles(grid.get_tile((x, y)) for y in range(height))
+    return (L_ew if cond else " " for cond in conds)
+
+def empty_gridlines(grid_size: tuple[str, str]):
+    """Return a list of strings representing an empty grid of specified size"""
     width, height = grid_size
     line_format = "{outer_left}" + "{separator}".join(repeat("{tile}" * 3, width))\
             + "{outer_right}"
@@ -514,7 +531,96 @@ def gridlines(grid_size: tuple[int, int]) -> list[str]:# {{{
         if y < height - 1:
             lines.append(line_mid)
     lines.append(line_bot)
-    return lines # }}}
+    return lines
+
+CELL_WIDTH = 3
+
+def format_row_from_elems(elems: Iterable[str]) -> str:
+    """Format a gridline row from row elements"""
+    cell = " " * CELL_WIDTH
+    inner = cell.join(elems)
+    return f"{L_ns}{cell}{inner}{cell}{L_ns}"
+
+def is_barrier(ch: str) -> bool:
+    """Return True if character is considered a barrier symbol"""
+    return ch != " "
+
+def join_barriers(north: str, east: str, south: str, west: str) -> str:
+    """Return symbol joining barriers in four directions"""
+    n = is_barrier(north)
+    e = is_barrier(east)
+    s = is_barrier(south)
+    w = is_barrier(west)
+    result = " "
+    if n and e and s and w:
+        result = L_nesw
+    elif n and e and w:
+        result = L_new
+    elif e and s and w:
+        result = L_esw
+    elif n and s and w:
+        result = L_nsw
+    elif n and e and s:
+        result = L_nes
+    elif n and w:
+        result = L_nw
+    elif n and e:
+        result = L_ne
+    elif s and w:
+        result = L_sw
+    elif e and s:
+        result = L_es
+    elif n and s:
+        result = L_ns
+    elif e and w:
+        result = L_ew
+    return result
+
+def format_grid_top_border(elems: Iterable[str]) -> str:
+    """Format top gridline border from row elements"""
+    cell = L_ew * CELL_WIDTH
+    inner = cell.join(L_esw if is_barrier(e) else L_ew for e in elems)
+    return f"{C_es}{cell}{inner}{cell}{C_sw}"
+
+def format_grid_bottom_border(elems: Iterable[str]) -> str:
+    """Format bottom gridline border from row elements"""
+    cell = L_ew * CELL_WIDTH
+    inner = cell.join(L_new if is_barrier(e) else L_ew for e in elems)
+    return f"{C_ne}{cell}{inner}{cell}{C_nw}"
+
+def gridlines(grid: TileGrid) -> list[str]:
+    """Return a list of strings corresponding to the text lines representing
+    the grid"""
+    if grid.empty():
+        return empty_gridlines(grid.grid_size)
+
+    width, height = grid.grid_size
+    rows = [list(iter_elems_from_grid_y(grid, y)) for y in range(height)]
+    seps = transpose_2d([list(iter_elems_from_grid_x(grid, x)) for x in range(width)])
+
+    irows = iter(rows)
+    above_row = next(irows)
+    lines = []
+    lines.append(format_grid_top_border(above_row))
+    lines.append(format_row_from_elems(above_row))
+    for sep, below_row in zip(seps, irows):
+        isep = iter(sep)
+        before_elem = next(isep)
+        sep_line = L_nes if is_barrier(before_elem) else L_ns
+        sep_line += before_elem * CELL_WIDTH
+
+        for after_elem, above_elem, below_elem in zip(isep, above_row, below_row):
+            sep_line += join_barriers(above_elem, after_elem, below_elem, before_elem)
+            sep_line += after_elem * CELL_WIDTH
+            before_elem = after_elem
+
+        sep_line += L_nsw if is_barrier(before_elem) else L_ns
+        lines.append(sep_line)
+        lines.append(format_row_from_elems(below_row))
+        above_row = below_row
+
+    lines.append(format_grid_bottom_border(above_row))
+    return lines
 
 def label_yxcoords(coords: tuple[int, int]) -> str:# {{{
     """Format a string with coordinates in y-x order"""
@@ -565,7 +671,7 @@ def get_symbol_for_coord_from(grid: TileGrid, coords: tuple[int, int]) -> str | 
         symbol = 'x'
     else:
         n_neighbouring_mines = count_neighbouring_mines(grid, coords)
-        symbol = '□' if n_neighbouring_mines == 0 else str(n_neighbouring_mines)
+        symbol = ' ' if n_neighbouring_mines == 0 else str(n_neighbouring_mines)
 
     return symbol# }}}
 
