@@ -44,6 +44,16 @@ class MovementEvent(tui.BaseEvent):
             return (fromx + self.x, fromy + self.y)
         return (self.x, self.y) # }}}
 
+@dataclass(slots = True)
+class SelectEvent(tui.BaseEvent):
+    """Event class for activating the current selection"""
+    ...
+
+@dataclass(slots = True)
+class PlaceFlagEvent(tui.BaseEvent):
+    """Event class for placing flags at the current selection"""
+    ...
+
 class Tile(Flag):
     """Flag Enumeration of grid tiles"""
     EMPTY = auto()
@@ -137,7 +147,8 @@ class DebugPanel:
         if self.update_callback is not None:
             self.update_callback()
 
-        tui.windraw_refresh(self.drawstate, self.padview)# }}}
+        tui.windraw_refresh(self.drawstate, self.padview)
+        self.stdwin.move_cursor(self.stdwin.stdcurs)# }}}
 
     def track(self, key: str, value: Any):# {{{
         """Add value or callable to map of tracked values"""
@@ -258,40 +269,44 @@ class MinesweeperApp:
         self.map_selection()
         self.stdwin.mainloop() # }}}
 
-    # TODO refactor callbacks
+    def on_resize(self):# {{{
+        """Callback for window resizing"""
+        curses.update_lines_cols()
+        self.gameview.resize()
+        self.stdwin.refresh()# }}}
+
+    def on_reset(self):# {{{
+        """Callback for window reset/refresh"""
+        self.stdwin.stdscr.clear()
+        self.stdwin.refresh()# }}}
+
+    # NOTE causes issue with resizing after breakpoint is triggered
+    # likely due to switching modes without them being correctly set up
+    def on_breakpoint(self):# {{{
+        """Callback for debug breakpoint"""
+        self.stdwin.stdscr.move(0, 0)
+        self.stdwin.stdscr.clrtobot()
+        self.stdwin.stdscr.refresh()
+        curses.reset_shell_mode()
+        breakpoint()
+        curses.reset_prog_mode()
+        self.stdwin.stdscr.clear()
+        self.stdwin.refresh()# }}}
+
+    def on_quit(self, _):# {{{
+        """Callback for quitting mainloop"""
+        self.stdwin.quit()# }}}
+
     def map_window(self): #{{{
         """Map the application keys for controlling the window state, such as
         screen refreshing, debug capabilities and quitting"""
-        def on_resize():
-            curses.update_lines_cols()
-            self.gameview.resize()
-            self.stdwin.refresh()
 
-        self.stdwin.add_mapping(tui.askey("KEY_RESIZE"), on_resize)
-
-        def on_reset():
-            self.stdwin.stdscr.clear()
-            self.stdwin.refresh()
-
-        self.stdwin.add_mapping(tui.askey("C-L"), on_reset)
-
+        self.stdwin.add_mapping(tui.askey("KEY_RESIZE"), self.on_resize)
+        self.stdwin.add_mapping(tui.askey("C-L"), self.on_reset)
         self.stdwin.add_mapping(tui.askey("g"), self.debug_panel.toggle)
+        self.stdwin.add_mapping(tui.askey("b"), self.on_breakpoint)
 
-        # NOTE causes issue with resizing after breakpoint is triggered
-        # likely due to switching modes without them being correctly set up
-        def on_breakpoint():
-            self.stdwin.stdscr.move(0, 0)
-            self.stdwin.stdscr.clrtobot()
-            self.stdwin.stdscr.refresh()
-            curses.reset_shell_mode()
-            breakpoint()
-            curses.reset_prog_mode()
-            self.stdwin.stdscr.clear()
-            self.stdwin.refresh()
-
-        self.stdwin.add_mapping(tui.askey("b"), on_breakpoint)
-
-        self.event_handler.bind(QuitEvent, lambda _: self.stdwin.quit())
+        self.event_handler.bind(QuitEvent, self.on_quit)
         on_quit = partial(self.event_handler.enqueue, QuitEvent())
         self.stdwin.add_mapping(tui.askey("C-C"), on_quit)
         self.stdwin.add_mapping(tui.askey("q"), on_quit) # }}}
@@ -307,7 +322,27 @@ class MinesweeperApp:
         stdwin.add_mapping(tui.askey("h"),
                            partial(event_handler.enqueue, MovementEvent(x = -1)))
         stdwin.add_mapping(tui.askey("l"),
-                           partial(event_handler.enqueue, MovementEvent(x = 1))) # }}}
+                           partial(event_handler.enqueue, MovementEvent(x = 1)))
+        stdwin.add_mapping(tui.askey("w"),
+                           partial(event_handler.enqueue, MovementEvent(y = -1)))
+        stdwin.add_mapping(tui.askey("s"),
+                           partial(event_handler.enqueue, MovementEvent(y = 1)))
+        stdwin.add_mapping(tui.askey("a"),
+                           partial(event_handler.enqueue, MovementEvent(x = -1)))
+        stdwin.add_mapping(tui.askey("d"),
+                           partial(event_handler.enqueue, MovementEvent(x = 1)))
+        stdwin.add_mapping(tui.askey("KEY_UP"),
+                           partial(event_handler.enqueue, MovementEvent(y = -1)))
+        stdwin.add_mapping(tui.askey("KEY_DOWN"),
+                           partial(event_handler.enqueue, MovementEvent(y = 1)))
+        stdwin.add_mapping(tui.askey("KEY_LEFT"),
+                           partial(event_handler.enqueue, MovementEvent(x = -1)))
+        stdwin.add_mapping(tui.askey("KEY_RIGHT"),
+                           partial(event_handler.enqueue, MovementEvent(x = 1)))
+        stdwin.add_mapping(tui.askey("KEY_ENTER"),
+                           partial(event_handler.enqueue, SelectEvent()))
+        stdwin.add_mapping(tui.askey("C-J"),
+                           partial(event_handler.enqueue, SelectEvent()))# }}}
 
     def track_values(self):# {{{
         """Initialise the debug panel with tracked values"""
