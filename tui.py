@@ -391,6 +391,7 @@ def unctrl(byte: int) -> str:# {{{
     '''Unwraps curses' '^C' to 'C'; used for constructing Key objects'''
     return cascii.unctrl(byte)[1] # }}}
 
+# TODO refactor to reduce amount of return statements
 def key_from_bytes(xs: list[int]) -> Key | None:# {{{
     """Convert raw keyboard bytes to a known Key object, or None if a valid key
     could not be processed from the input bytes"""
@@ -398,27 +399,24 @@ def key_from_bytes(xs: list[int]) -> Key | None:# {{{
     x = xs[0]
     xs = xs[:-1] if xs[-1] == -1 else xs
 
-    result: Key | None = None
     if x == -1:
-        result = IDLE_KEY
+        return IDLE_KEY
     if x >= curses.KEY_MIN and len(xs) == 1:
-        result = Key(curses.keyname(x), special = True)
+        return Key(curses.keyname(x), special = True)
     if x > 0x80:
         try:
-            result = Key(bytes(xs).decode("utf-8"))
+            return Key(bytes(xs).decode("utf-8"))
         except UnicodeDecodeError:
             # could log, but I don't currently have a mechanism for that TODO maybe ???
-            result = None
+            return None
     if x == cascii.ESC and cascii.isctrl(xs[1]):
-        result = Key(unctrl(xs[1]), ctrl = True, alt = True)
+        return Key(unctrl(xs[1]), ctrl = True, alt = True)
     if x == cascii.ESC:
-        result = Key(chr(xs[1]), alt = True)
+        return Key(chr(xs[1]), alt = True)
     if cascii.isctrl(x):
-        result = Key(unctrl(x), ctrl = True)
+        return Key(unctrl(x), ctrl = True)
     else:
-        result = Key(chr(x))
-
-    return result # }}}
+        return Key(chr(x))# }}}
 
 SPECIAL_KEYS = tuple(m for m in dir(curses) if m.startswith("KEY_"))
 
