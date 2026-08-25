@@ -194,9 +194,7 @@ class GameView:
         self.padview = tui.PadView(self.window, desired_screen_start = (2, 0))
         self.drawstate = tui.WindowDrawState(self.window)
         self.drawstate.on_draw = self.on_draw
-        self.stdwin.add_child(self.drawstate, self.padview)
-
-        self.event_handler.bind(MovementEvent, self.on_grid_selection_changed)# }}}
+        self.stdwin.add_child(self.drawstate, self.padview)# }}}
 
     def on_draw(self, win: curses.window) -> bool:# {{{
         """Callback for drawing"""
@@ -219,6 +217,20 @@ class GameView:
         stdwin.stdcurs = get_grid_view_screen_cursor(self.padview, self.selection)
         stdwin.move_cursor(stdwin.stdcurs)# }}}
 
+    def on_select(self, _):
+        """Callback for activating current selection"""
+        raise NotImplementedError
+
+    def on_flag(self, _):
+        """Callback for toggling flag at the current grid selection"""
+        raise NotImplementedError
+
+    def bind_events(self):# {{{
+        """Bind game events"""
+        self.event_handler.bind(MovementEvent, self.on_grid_selection_changed)
+        self.event_handler.bind(SelectEvent, self.on_select)
+        self.event_handler.bind(PlaceFlagEvent, self.on_flag)# }}}
+
     def resize(self):# {{{
         """Resize the window view to fill the available space"""
         height, width = scale_grid_coords_to_screen_offset(self.grid.grid_size)
@@ -228,12 +240,21 @@ class GameView:
         starty = 2
         startx = (curses.COLS - width) // 2
         self.padview.desired_screen_start = (starty, startx)
-        self.padview.desired_view_size = (height, width)
+        self.padview.desired_view_size = (height, width)# }}}
 
+    def focus_cursor(self):# {{{
+        """Focus screen cursor to grid selection"""
         # TODO check if gameview has focus
         stdwin = self.stdwin
         stdwin.stdcurs = get_grid_view_screen_cursor(self.padview, self.selection)
         stdwin.move_cursor(stdwin.stdcurs)# }}}
+
+    def map_game_controls(self):# {{{
+        """Map keys for game controls"""
+        stdwin = self.stdwin
+        event_handler = self.event_handler
+        stdwin.add_mapping(tui.askey(" "), partial(event_handler.enqueue, SelectEvent()))
+        stdwin.add_mapping(tui.askey("f"), partial(event_handler.enqueue, PlaceFlagEvent()))# }}}
 
 @dataclass(slots = True)
 class TextWindow:
@@ -263,16 +284,20 @@ class MinesweeperApp:
 
         self.stdwin.stdcurs.cursor = (-1, -1)
         self.gameview.resize()
+        self.gameview.focus_cursor()
         self.stdwin.refresh()
 
         self.map_window()
         self.map_selection()
+        self.gameview.bind_events()
+        self.gameview.map_game_controls()
         self.stdwin.mainloop() # }}}
 
     def on_resize(self):# {{{
         """Callback for window resizing"""
         curses.update_lines_cols()
         self.gameview.resize()
+        self.gameview.focus_cursor()
         self.stdwin.refresh()# }}}
 
     def on_reset(self):# {{{
