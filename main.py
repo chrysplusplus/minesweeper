@@ -66,6 +66,7 @@ class TileGrid:
     __slots__ = ("_grid", "_grid_size", "_mines")
 
     def __init__(self, grid: list[Tile], grid_size: tuple[int, int], mines: int):# {{{
+        assert mines < (grid_size[0] * grid_size[1])
         self._grid: list[Tile] = grid
         self._grid_size = grid_size
         self._mines = mines # }}}
@@ -105,6 +106,21 @@ class TileGrid:
         return self._grid[y * width + x] \
                 if width > x >= 0 and height > y >= 0 \
                 else None# }}}
+
+    def empty(self) -> bool:# {{{
+        """Return True if the grid is empty and unpopulated"""
+        return len(self._grid) == 0# }}}
+
+    def populate_except_for(self, *except_coords: tuple[int, int]):# {{{
+        """Populate grid from grid_size and mines, avoiding specified coords"""
+        width, height = self._grid_size
+        locations = [(x, y) for x in range(width) for y in range(height)
+                     if (x, y) not in except_coords]
+        shuffle(locations)
+
+        self._grid = [Tile.EMPTY for _ in range(width) for _ in range(height)]
+        for minex, miney in locations[:self._mines]:
+            self._grid[miney * width + minex] = Tile.MINE# }}}
 
 class DebugPanel:
     """Debug window that can override MainWindow on_post_key to update on every
@@ -191,13 +207,13 @@ class GameView:
     """Class for drawing the Minesweeper grid and handling game logic"""
     __slots__ = ("stdwin", "event_handler", "selection", "grid", "window", "padview", "drawstate")
 
-    def __init__(self, stdwin: tui.MainWindow, event_handler: tui.EventHandler):# {{{
+    def __init__(
+            self, stdwin: tui.MainWindow, event_handler: tui.EventHandler, grid: TileGrid):# {{{
         self.stdwin = stdwin
         self.event_handler = event_handler
+        self.grid = grid
 
         self.selection = (0, 0)
-        # TODO implement opening mercy (no mines around the first tile selected)
-        self.grid = generate_grid((10, 10), 30)
 
         self.window = curses.newpad(100, 100)
         self.padview = tui.PadView(self.window, desired_screen_start = (2, 0))
@@ -227,17 +243,14 @@ class GameView:
         stdwin.stdcurs = get_grid_view_screen_cursor(self.padview, self.selection)
         stdwin.move_cursor(stdwin.stdcurs)# }}}
 
-    def on_select(self, _):
+    def on_select(self, _):# {{{
         """Callback for activating current selection"""
-        tile = self.grid.get_tile(self.selection)
-        if Tile.SEEN in tile:
-            return
-        if Tile.FLAG in tile:
-            return
+        if self.grid.empty():
+            self.grid.populate_except_for(
+                    *iter_3x3_area_coords(self.grid.grid_size, self.selection))
 
-        tile ^= Tile.SEEN
-        self.grid.set_tile(self.selection, tile)
-        self.update_tile_display(self.selection)
+        self._reveal_tile_at(self.selection)
+        self.refresh()# }}}
 
     def on_flag(self, _):# {{{
         """Callback for toggling flag at the current grid selection"""
@@ -247,7 +260,8 @@ class GameView:
 
         tile ^= Tile.FLAG
         self.grid.set_tile(self.selection, tile)
-        self.update_tile_display(self.selection)# }}}
+        self.mark_tile_at(self.selection)
+        self.refresh()# }}}
 
     def bind_events(self):# {{{
         """Bind game events"""
@@ -266,6 +280,23 @@ class GameView:
         self.padview.desired_screen_start = (starty, startx)
         self.padview.desired_view_size = (height, width)# }}}
 
+    def _reveal_tile_at(self, coords: tuple[int, int]):# {{{
+        """Reveal the tile at the specified coord"""
+        tile = self.grid.get_tile(coords)
+        if Tile.SEEN in tile or Tile.FLAG in tile:
+            return
+
+        tile ^= Tile.SEEN
+        self.grid.set_tile(coords, tile)
+        self.mark_tile_at(coords)
+
+        neighbour_coords = list(iter_3x3_area_coords(self.grid.grid_size, coords))
+        neighbour_tiles = (self.grid.get_tile(neighbour) for neighbour in neighbour_coords)
+        n_neighbouring_mines = sum(Tile.MINE in t for t in neighbour_tiles)
+        if n_neighbouring_mines == 0:
+            for neighbour in neighbour_coords:
+                self._reveal_tile_at(neighbour)# }}}
+
     def focus_cursor(self):# {{{
         """Focus screen cursor to grid selection"""
         # TODO check if gameview has focus
@@ -273,14 +304,17 @@ class GameView:
         stdwin.stdcurs = get_grid_view_screen_cursor(self.padview, self.selection)
         stdwin.move_cursor(stdwin.stdcurs)# }}}
 
-    def update_tile_display(self, coords: tuple[int, int]):# {{{
-        """Update the specified grid coordinate in the window"""
+    def mark_tile_at(self, coords: tuple[int, int]):# {{{
+        """Mark the tile at the specified coords to be updated on the next refresh"""
         w, h = self.grid.grid_size
         x, y = coords
         assert 0 <= x < w and 0 <= y < h
         symbol = get_symbol_for_coord_from(self.grid, coords)
         symbol = ' ' if symbol is None else symbol
-        self.window.addch(*scale_grid_coords_to_screen_offset(coords), symbol)
+        self.window.addch(*scale_grid_coords_to_screen_offset(coords), symbol)# }}}
+
+    def refresh(self):# {{{
+        """Update the window with any marked tiles"""
         self.window.refresh(*tui.padview_clamp(self.padview))
         self.stdwin.move_cursor(self.stdwin.stdcurs)# }}}
 
@@ -310,7 +344,7 @@ class MinesweeperApp:
         self.event_handler = tui.EventHandler()
         self.stdwin.on_post_key = self.event_handler.process
 
-        self.gameview = GameView(self.stdwin, self.event_handler)
+        self.gameview = GameView(self.stdwin, self.event_handler, empty_tile_grid((10, 10), 30))
         self.keyhelp = key_instruction_bar(self.stdwin, self.event_handler)
         self.overlay = overlay(self.stdwin, self.event_handler)
         self.titlebar = titlebar(self.stdwin, self.event_handler)
@@ -455,18 +489,6 @@ def empty_tile_grid(grid_size: tuple[int, int], mines: int) -> TileGrid:# {{{
     """Create an empty grid"""
     return TileGrid([], grid_size, mines) # }}}
 
-def generate_grid(grid_size: tuple[int, int], mines: int) -> TileGrid:# {{{
-    """Generate a grid of specified size with specified amount of mines"""
-    height, width = grid_size
-    locations = [(x, y) for x in range(width) for y in range(height)]
-    shuffle(locations)
-
-    grid = [Tile.EMPTY for _ in range(width) for _ in range(height)]
-    for minex,miney in locations[:mines]:
-        grid[miney * width + minex] = Tile.MINE
-
-    return TileGrid(grid, grid_size, mines) # }}}
-
 def gridlines(grid_size: tuple[int, int]) -> list[str]:# {{{
     """Return a list of strings corresponding to the text lines representing a
     grid of a specified size"""
@@ -499,6 +521,18 @@ def label_xycoords(coords: tuple[int, int]) -> str:# {{{
     """Format a string with coordinates in x-y order"""
     return label_tuple(coords, "x", "y") # }}}
 
+def iter_3x3_area_coords(grid_size: tuple[int, int], coords: tuple[int, int]) -> Iterable[Tile]:# {{{
+    """Return an iterator of coordinates in a 3x3 area cetnered around
+    specified coords for a specified grid size"""
+    thisx, thisy = coords
+    width, height = grid_size
+    for i in (-1, 0, 1):
+        for j in (-1, 0, 1):
+            x = i + thisx
+            y = j + thisy
+            if 0 <= x < width and 0 <= y < height:
+                yield (x, y)# }}}
+
 def iter_grid_neighbours(grid: TileGrid, coords: tuple[int, int]) -> Iterable[Tile]:# {{{
     """Return an iterator of neighbouring tiles to specfied grid coordinates"""
     thisx, thisy = coords
@@ -511,6 +545,11 @@ def iter_grid_neighbours(grid: TileGrid, coords: tuple[int, int]) -> Iterable[Ti
                 continue
             yield neighbour# }}}
 
+def count_neighbouring_mines(grid: TileGrid, coords: tuple[int, int]) -> int:# {{{
+    """Count the number of mines neighbouring the specified coordinates in the
+    specified grid"""
+    return sum(Tile.MINE in t for t in iter_grid_neighbours(grid, coords))# }}}
+
 def get_symbol_for_coord_from(grid: TileGrid, coords: tuple[int, int]) -> str | None:# {{{
     """Determine display symbol for grid coordinates"""
     tile = grid.get_tile(coords)
@@ -522,8 +561,7 @@ def get_symbol_for_coord_from(grid: TileGrid, coords: tuple[int, int]) -> str | 
     elif Tile.MINE in tile:
         symbol = 'x'
     else:
-        n_neighbouring_mines = sum(1 if Tile.MINE in t else 0
-                                   for t in iter_grid_neighbours(grid, coords))
+        n_neighbouring_mines = count_neighbouring_mines(grid, coords)
         symbol = '□' if n_neighbouring_mines == 0 else str(n_neighbouring_mines)
 
     return symbol# }}}
