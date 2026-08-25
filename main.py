@@ -254,6 +254,9 @@ class GameView:
 
     def on_flag(self, _):# {{{
         """Callback for toggling flag at the current grid selection"""
+        if self.grid.empty():
+            return
+
         tile = self.grid.get_tile(self.selection)
         if Tile.SEEN in tile:
             return
