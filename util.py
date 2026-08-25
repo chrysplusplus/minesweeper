@@ -61,8 +61,8 @@ def compose2(fn0: Callable[[Any], T], fn1: Callable[[T], U]) -> Callable[[Any], 
     """Return the composition of two functions"""
     return lambda *args, **kwargs: fn1(fn0(*args, **kwargs))# }}}
 
-def transpose_2d(l: list[list[T]]) -> list[list[T]]:
+def transpose_2d(l: list[list[T]]) -> list[list[T]]:# {{{
     """Transpose list of lists"""
-    return [list(inner) for inner in zip(*l)]
+    return [list(inner) for inner in zip(*l)]# }}}
 
 # vim: foldmethod=marker

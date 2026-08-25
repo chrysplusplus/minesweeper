@@ -399,24 +399,26 @@ def key_from_bytes(xs: list[int]) -> Key | None:# {{{
     x = xs[0]
     xs = xs[:-1] if xs[-1] == -1 else xs
 
+    result: Key | None
     if x == -1:
-        return IDLE_KEY
-    if x >= curses.KEY_MIN and len(xs) == 1:
-        return Key(curses.keyname(x), special = True)
-    if x > 0x80:
+        result = IDLE_KEY
+    elif x >= curses.KEY_MIN and len(xs) == 1:
+        result = Key(curses.keyname(x), special = True)
+    elif x > 0x80:
         try:
-            return Key(bytes(xs).decode("utf-8"))
+            result = Key(bytes(xs).decode("utf-8"))
         except UnicodeDecodeError:
             # could log, but I don't currently have a mechanism for that TODO maybe ???
-            return None
-    if x == cascii.ESC and cascii.isctrl(xs[1]):
-        return Key(unctrl(xs[1]), ctrl = True, alt = True)
-    if x == cascii.ESC:
-        return Key(chr(xs[1]), alt = True)
-    if cascii.isctrl(x):
-        return Key(unctrl(x), ctrl = True)
+            result = None
+    elif x == cascii.ESC and cascii.isctrl(xs[1]):
+        result = Key(unctrl(xs[1]), ctrl = True, alt = True)
+    elif x == cascii.ESC:
+        result = Key(chr(xs[1]), alt = True)
+    elif cascii.isctrl(x):
+        result = Key(unctrl(x), ctrl = True)
     else:
-        return Key(chr(x))# }}}
+        result = Key(chr(x))# }}}
+    return result
 
 SPECIAL_KEYS = tuple(m for m in dir(curses) if m.startswith("KEY_"))
 

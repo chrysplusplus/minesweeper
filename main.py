@@ -493,24 +493,24 @@ def empty_tile_grid(grid_size: tuple[int, int], mines: int) -> TileGrid:# {{{
     """Create an empty grid"""
     return TileGrid([], grid_size, mines) # }}}
 
-def iter_conds_from_tiles(tiles: Iterable[Tile]) -> Iterable[bool]:
+def iter_conds_from_tiles(tiles: Iterable[Tile]) -> Iterable[bool]:# {{{
     """Return an iterator of barrier conditions for a collection of tiles"""
     for first_tile, second_tile in pairwise(tiles):
-        yield False if Tile.SEEN in first_tile and Tile.SEEN in second_tile else True
+        yield Tile.SEEN not in first_tile or Tile.SEEN not in second_tile# }}}
 
-def iter_elems_from_grid_y(grid: TileGrid, y: int) -> Iterable[str]:
+def iter_elems_from_grid_y(grid: TileGrid, y: int) -> Iterable[str]:# {{{
     """Return gridline elements for the specified y-coordinate in grid"""
     width, _ = grid.grid_size
     conds = iter_conds_from_tiles(grid.get_tile((x, y)) for x in range(width))
-    return (L_ns if cond else " " for cond in conds)
+    return (L_ns if cond else " " for cond in conds)# }}}
 
-def iter_elems_from_grid_x(grid: TileGrid, x: int) -> Iterable[str]:
+def iter_elems_from_grid_x(grid: TileGrid, x: int) -> Iterable[str]:# {{{
     """Return gridline elements for the specified x-coordinate in grid"""
     _, height = grid.grid_size
     conds = iter_conds_from_tiles(grid.get_tile((x, y)) for y in range(height))
-    return (L_ew if cond else " " for cond in conds)
+    return (L_ew if cond else " " for cond in conds)# }}}
 
-def empty_gridlines(grid_size: tuple[str, str]):
+def empty_gridlines(grid_size: tuple[str, str]):# {{{
     """Return a list of strings representing an empty grid of specified size"""
     width, height = grid_size
     line_format = "{outer_left}" + "{separator}".join(repeat("{tile}" * 3, width))\
@@ -531,21 +531,21 @@ def empty_gridlines(grid_size: tuple[str, str]):
         if y < height - 1:
             lines.append(line_mid)
     lines.append(line_bot)
-    return lines
+    return lines# }}}
 
 CELL_WIDTH = 3
 
-def format_row_from_elems(elems: Iterable[str]) -> str:
+def format_row_from_elems(elems: Iterable[str]) -> str:# {{{
     """Format a gridline row from row elements"""
     cell = " " * CELL_WIDTH
     inner = cell.join(elems)
-    return f"{L_ns}{cell}{inner}{cell}{L_ns}"
+    return f"{L_ns}{cell}{inner}{cell}{L_ns}"# }}}
 
-def is_barrier(ch: str) -> bool:
+def is_barrier(ch: str) -> bool:# {{{
     """Return True if character is considered a barrier symbol"""
-    return ch != " "
+    return ch != " "# }}}
 
-def join_barriers(north: str, east: str, south: str, west: str) -> str:
+def join_barriers(north: str, east: str, south: str, west: str) -> str:# {{{
     """Return symbol joining barriers in four directions"""
     n = is_barrier(north)
     e = is_barrier(east)
@@ -574,21 +574,37 @@ def join_barriers(north: str, east: str, south: str, west: str) -> str:
         result = L_ns
     elif e and w:
         result = L_ew
-    return result
+    return result# }}}
 
-def format_grid_top_border(elems: Iterable[str]) -> str:
+def format_grid_top_border(elems: Iterable[str]) -> str:# {{{
     """Format top gridline border from row elements"""
     cell = L_ew * CELL_WIDTH
     inner = cell.join(L_esw if is_barrier(e) else L_ew for e in elems)
-    return f"{C_es}{cell}{inner}{cell}{C_sw}"
+    return f"{C_es}{cell}{inner}{cell}{C_sw}"# }}}
 
-def format_grid_bottom_border(elems: Iterable[str]) -> str:
+def format_grid_bottom_border(elems: Iterable[str]) -> str:# {{{
     """Format bottom gridline border from row elements"""
     cell = L_ew * CELL_WIDTH
     inner = cell.join(L_new if is_barrier(e) else L_ew for e in elems)
-    return f"{C_ne}{cell}{inner}{cell}{C_nw}"
+    return f"{C_ne}{cell}{inner}{cell}{C_nw}"# }}}
 
-def gridlines(grid: TileGrid) -> list[str]:
+def format_sep_line(# {{{
+        sep: Iterable[str], above_row: Iterable[str], below_row: Iterable[str]) -> str:
+    """Format seperator line between rows"""
+    isep = iter(sep)
+    before_elem = next(isep)
+    sep_line = L_nes if is_barrier(before_elem) else L_ns
+    sep_line += before_elem * CELL_WIDTH
+
+    for after_elem, above_elem, below_elem in zip(isep, above_row, below_row):
+        sep_line += join_barriers(above_elem, after_elem, below_elem, before_elem)
+        sep_line += after_elem * CELL_WIDTH
+        before_elem = after_elem
+
+    sep_line += L_nsw if is_barrier(before_elem) else L_ns
+    return sep_line# }}}
+
+def gridlines(grid: TileGrid) -> list[str]:# {{{
     """Return a list of strings corresponding to the text lines representing
     the grid"""
     if grid.empty():
@@ -604,23 +620,12 @@ def gridlines(grid: TileGrid) -> list[str]:
     lines.append(format_grid_top_border(above_row))
     lines.append(format_row_from_elems(above_row))
     for sep, below_row in zip(seps, irows):
-        isep = iter(sep)
-        before_elem = next(isep)
-        sep_line = L_nes if is_barrier(before_elem) else L_ns
-        sep_line += before_elem * CELL_WIDTH
-
-        for after_elem, above_elem, below_elem in zip(isep, above_row, below_row):
-            sep_line += join_barriers(above_elem, after_elem, below_elem, before_elem)
-            sep_line += after_elem * CELL_WIDTH
-            before_elem = after_elem
-
-        sep_line += L_nsw if is_barrier(before_elem) else L_ns
-        lines.append(sep_line)
+        lines.append(format_sep_line(sep, above_row, below_row))
         lines.append(format_row_from_elems(below_row))
         above_row = below_row
 
     lines.append(format_grid_bottom_border(above_row))
-    return lines
+    return lines# }}}
 
 def label_yxcoords(coords: tuple[int, int]) -> str:# {{{
     """Format a string with coordinates in y-x order"""
@@ -630,7 +635,8 @@ def label_xycoords(coords: tuple[int, int]) -> str:# {{{
     """Format a string with coordinates in x-y order"""
     return label_tuple(coords, "x", "y") # }}}
 
-def iter_3x3_area_coords(grid_size: tuple[int, int], coords: tuple[int, int]) -> Iterable[Tile]:# {{{
+def iter_3x3_area_coords(
+        grid_size: tuple[int, int], coords: tuple[int, int]) -> Iterable[Tile]:# {{{
     """Return an iterator of coordinates in a 3x3 area cetnered around
     specified coords for a specified grid size"""
     thisx, thisy = coords
