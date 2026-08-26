@@ -9,6 +9,7 @@ TODO
 - [X] Debug updates after any key press
 - [ ] Ensure game padview is large enough for the grid
 - [ ] Implement game logic
+- [ ] Change vim-fold style
 """
 
 import curses
@@ -65,13 +66,14 @@ class Tile(Flag):
 
 class TileGrid:
     """Class representing grid of tiles"""
-    __slots__ = ("_grid", "_grid_size", "_mines")
+    __slots__ = ("_grid", "_grid_size", "_mines", "_flags")
 
     def __init__(self, grid: list[Tile], grid_size: tuple[int, int], mines: int):# {{{
         assert mines < (grid_size[0] * grid_size[1])
         self._grid: list[Tile] = grid
         self._grid_size = grid_size
-        self._mines = mines # }}}
+        self._mines = mines
+        self._flags = 0# }}}
 
     def __iter__(self):# {{{
         for i, tile in enumerate(self._grid):
@@ -84,8 +86,8 @@ class TileGrid:
 
     @property
     def mines(self):# {{{
-        """Number of mines in the grid, read-only"""
-        return self._mines # }}}
+        """Number of mines remaining in the grid, read-only"""
+        return self._mines - self._flags# }}}
 
     def get_tile(self, coord: tuple[int, int]) -> Tile:# {{{
         """Get tile at coordinate"""
@@ -99,6 +101,7 @@ class TileGrid:
         width, height = self._grid_size
         x, y = coord
         assert width > x >= 0 and height > y >= 0
+        self._check_flag(coord, tile)
         self._grid[y * width + x] = tile # }}}
 
     def get_maybe_tile(self, coord: tuple[int, int]) -> Tile | None:# {{{
@@ -123,6 +126,16 @@ class TileGrid:
         self._grid = [Tile.EMPTY for _ in range(width) for _ in range(height)]
         for minex, miney in locations[:self._mines]:
             self._grid[miney * width + minex] = Tile.MINE# }}}
+
+    def _check_flag(self, coord: tuple[int, int], new_tile: Tile):
+        """Determine whether changing tile affects the flag count"""
+        x, y = coord
+        width, _ = self._grid_size
+        old_tile = self._grid[y * width + x]
+        if Tile.FLAG in old_tile and Tile.FLAG not in new_tile:
+            self._flags -= 1
+        elif Tile.FLAG not in old_tile and Tile.FLAG in new_tile:
+            self._flags += 1
 
 class DebugPanel:
     """Debug window that can override MainWindow on_post_key to update on every
@@ -233,6 +246,8 @@ class GameView:
             if symbol is not None:
                 win.addch(*scale_grid_coords_to_screen_offset(coords), symbol)
 
+        self.update_mine_counter(win)
+
         return True# }}}
 
     def on_grid_selection_changed(self, e: MovementEvent):# {{{
@@ -265,6 +280,7 @@ class GameView:
         tile ^= Tile.FLAG
         self.grid.set_tile(self.selection, tile)
         self.mark_tile_at(self.selection)
+        self.update_mine_counter(self.window)
         self.refresh()# }}}
 
     def bind_events(self):# {{{
@@ -316,6 +332,10 @@ class GameView:
         symbol = get_symbol_for_coord_from(self.grid, coords)
         symbol = ' ' if symbol is None else symbol
         self.window.addch(*scale_grid_coords_to_screen_offset(coords), symbol)# }}}
+
+    def update_mine_counter(self, win: curses.window):
+        """Update the mine counter line"""
+        win.addstr(get_grid_height(self.grid.grid_size), 0, f'Mines left: {self.grid.mines}', ATTR_CYAN)
 
     def refresh(self):# {{{
         """Update the window with any marked tiles"""
@@ -635,8 +655,8 @@ def label_xycoords(coords: tuple[int, int]) -> str:# {{{
     """Format a string with coordinates in x-y order"""
     return label_tuple(coords, "x", "y") # }}}
 
-def iter_3x3_area_coords(
-        grid_size: tuple[int, int], coords: tuple[int, int]) -> Iterable[Tile]:# {{{
+def iter_3x3_area_coords(# {{{
+        grid_size: tuple[int, int], coords: tuple[int, int]) -> Iterable[Tile]:
     """Return an iterator of coordinates in a 3x3 area cetnered around
     specified coords for a specified grid size"""
     thisx, thisy = coords
@@ -700,6 +720,11 @@ def get_grid_view_screen_cursor(# {{{
     starty, startx = grid_view.desired_screen_start
     pady, padx = grid_view.pad_start
     return tui.Cursor((starty - pady + y, startx - padx + x))# }}}
+
+def get_grid_height(grid_size: tuple[int, int]) -> int:
+    """Calculate height of grid in window from its grid size"""
+    _, height = grid_size
+    return 2 * height + 1
 
 def key_instruction_bar(stdwin: tui.MainWindow, event_handler: tui.EventHandler) -> TextWindow:# {{{
     """Object for drawing key instructions"""
