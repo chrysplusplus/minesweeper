@@ -10,8 +10,9 @@ TODO
 - [ ] Ensure game padview and screen are large enough for the grid
 - [ ] Implement game logic
     - [X] Lose on revealing a mine
-    - [ ] Win on revealing last empty tile
+    - [X] Win on revealing last empty tile
 - [ ] Implement settings dialog
+- [ ] Add styles for different tiles
 - [X] Change vim-fold style
 """
 
@@ -61,6 +62,10 @@ class PlaceFlagEvent(tui.BaseEvent):
 class GameLoseEvent(tui.BaseEvent):
     """Event class for the user losing the game"""
     coords: tuple[int, int]
+
+@dataclass(slots = True)
+class GameWinEvent(tui.BaseEvent):
+    """Event class for the user winning the game"""
 
 class Tile(Flag):
     """Flag Enumeration of grid tiles"""
@@ -254,6 +259,13 @@ class GameView:
         win.addstr(get_grid_height(self.grid.grid_size), 0, "You lose!", ATTR_RED)
         return True# }}}
 
+    def on_win_draw(self, win: curses.window) -> bool:
+        """Callback for drawing after winning the game"""# {{{
+        win.erase()
+        self.draw_grid(win)
+        win.addstr(get_grid_height(self.grid.grid_size), 0, "You win!", ATTR_YELLOW)
+        return True# }}}
+
     def on_grid_selection_changed(self, e: MovementEvent):
         """Callback for updating grid selection"""# {{{
         stdwin = self.stdwin
@@ -296,6 +308,13 @@ class GameView:
         tui.windraw_refresh(self.drawstate, self.padview)
         self.stdwin.move_cursor(self.stdwin.stdcurs)# }}}
 
+    def on_win(self, _):
+        """Callback for winning the game"""# {{{
+        self.unbind_game_events()
+        self.drawstate.on_draw = self.on_win_draw
+        tui.windraw_refresh(self.drawstate, self.padview)
+        self.stdwin.move_cursor(self.stdwin.stdcurs)# }}}
+
     def bind_events(self):
         """Bind game events"""# {{{
         self.bind_movement_events()
@@ -313,13 +332,15 @@ class GameView:
         """Bind game events"""# {{{
         self.event_handler.bind(SelectEvent, self.on_select)
         self.event_handler.bind(PlaceFlagEvent, self.on_flag)
-        self.event_handler.bind(GameLoseEvent, self.on_lose)# }}}
+        self.event_handler.bind(GameLoseEvent, self.on_lose)
+        self.event_handler.bind(GameWinEvent, self.on_win)# }}}
 
     def unbind_game_events(self):
         """Unbind game events"""# {{{
         self.event_handler.unbind(SelectEvent)
         self.event_handler.unbind(PlaceFlagEvent)
-        self.event_handler.unbind(GameLoseEvent)# }}}
+        self.event_handler.unbind(GameLoseEvent)
+        self.event_handler.unbind(GameWinEvent)# }}}
 
     def draw_grid(self, win: curses.window, *, lose_coords: tuple[int, int] | None = None):
         """Draw the grid to the window"""# {{{
@@ -349,7 +370,7 @@ class GameView:
         if Tile.SEEN in tile or Tile.FLAG in tile:
             return
 
-        tile ^= Tile.SEEN
+        tile |= Tile.SEEN
         self.grid.set_tile(coords, tile)
         self.mark_tile_at(coords)
 
@@ -362,7 +383,12 @@ class GameView:
         n_neighbouring_mines = sum(Tile.MINE in t for t in neighbour_tiles)
         if n_neighbouring_mines == 0:
             for neighbour in neighbour_coords:
-                self.reveal_tile_at(neighbour)# }}}
+                self.reveal_tile_at(neighbour)
+
+        n_remaining_empty_tiles = sum(Tile.EMPTY in t and Tile.SEEN not in t for _, t in self.grid)
+        if n_remaining_empty_tiles == 0:
+            self.event_handler.enqueue(GameWinEvent())
+            return# }}}
 
     def reveal_all_mines(self):
         """Reveal all the mines in the grid"""# {{{
