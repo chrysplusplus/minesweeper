@@ -91,7 +91,7 @@ linechars = [#      1    2    3    4    5{{{
              "49", "╪", "╫", "╬",
              "53", "╭", "╮", "╯", "╰" ]# }}}
 
-L_ew, L_ns                         = linechars[1],  linechars[2]# {{{
+L_ew, L_ns                         = linechars[1],  linechars[2]
 L_es, L_sw, L_ne, L_nw             = linechars[4],  linechars[5],  linechars[6],  linechars[7]
 L_nes, L_nsw, L_esw, L_new, L_nesw = linechars[9],  linechars[10], linechars[11], linechars[12],\
         linechars[13]
@@ -105,7 +105,7 @@ L_nsW, L_NSw, L_NSW                = linechars[38], linechars[39], linechars[40]
 L_EsW, L_eSw, L_ESW                = linechars[42], linechars[43], linechars[44]
 L_nEW, L_New, L_NEW                = linechars[46], linechars[47], linechars[48]
 L_nEsW, L_NeSw, L_NESW             = linechars[50], linechars[51], linechars[52]
-C_es, C_sw, C_nw, C_ne             = linechars[54], linechars[55], linechars[56], linechars[57]# }}}
+C_es, C_sw, C_nw, C_ne             = linechars[54], linechars[55], linechars[56], linechars[57]
 
 @dataclass(slots = True, frozen = True)
 class Key:
@@ -145,18 +145,17 @@ KeyMap = OrderedDict[Key, Callable[[], None]]
 class BaseEvent:
     """Base class for specifying events; sub-class this to add custom messages
     to an application"""
-    ...
 
 class EventHandler:
     """Handler for processing application events"""
     __slots__ = ("callbacks", "queue")
 
-    def __init__(self):# {{{
-        self.callbacks: OrderedDict[type, Callable[[BaseEvent], None]] = OrderedDict()
+    def __init__(self):
+        self.callbacks: OrderedDict[type, Callable[[BaseEvent], None]] = OrderedDict()# {{{
         self.queue: list[BaseEvent] = [] # }}}
 
-    def bind(self, event_t: type, callback: Callable[[BaseEvent], None]) -> bool:# {{{
-        """Bind event type to callback
+    def bind(self, event_t: type, callback: Callable[[BaseEvent], None]) -> bool:
+        """Bind event type to callback# {{{
 
         event_t must be a subclass of BaseEvent
 
@@ -167,10 +166,10 @@ class EventHandler:
         self.callbacks[event_t] = callback
         return True # }}}
 
-    def rebind(self,# {{{
+    def rebind(self,
                event_t: type,
                callback: Callable[[BaseEvent], None]) -> Callable[[BaseEvent], None] | None:
-        """Force binding event type to callback
+        """Force binding event type to callback# {{{
 
         event_t must be a subclass of BaseEvent
 
@@ -184,12 +183,12 @@ class EventHandler:
             previous_callback = None
         return previous_callback # }}}
 
-    def enqueue(self, event: BaseEvent) -> bool:# {{{
-        """Enqueue event"""
+    def enqueue(self, event: BaseEvent) -> bool:
+        """Enqueue event"""# {{{
         self.queue.append(event) # }}}
 
-    def process(self):# {{{
-        """Process event queue"""
+    def process(self):
+        """Process event queue"""# {{{
         while len(self.queue) > 0:
             event = self.queue.pop(0)
             if type(event) not in self.callbacks:
@@ -208,13 +207,13 @@ class MainWindow:
     __slots__ = ("_stdscr", "children", "keymap", "is_running", "_getkbytes", "stdcurs",
                  "on_post_key", "forwarding_args")
 
-    def __init__(self,# {{{
+    def __init__(self,
                  stdscr_: curses.window,
                  *args,
                  nodelay: bool = False,
                  on_post_key: Callable[[], None] | None = None,
                  **kwargs):
-        self._stdscr = stdscr_
+        self._stdscr = stdscr_# {{{
         self.children: list[ChildWindow] = []
         self.keymap: KeyMap = OrderedDict()
         self.is_running = False
@@ -230,17 +229,17 @@ class MainWindow:
             self._getkbytes = getkbytes_blocking# }}}
 
     @property
-    def stdscr(self) -> curses.window:# {{{
-        """The curses window corresponding to the physical screen"""
+    def stdscr(self) -> curses.window:
+        """The curses window corresponding to the physical screen"""# {{{
         return self._stdscr# }}}
 
     @property
-    def stddraw(self) -> WindowDrawState:# {{{
-        """The bundled drawing context of the main window"""
+    def stddraw(self) -> WindowDrawState:
+        """The bundled drawing context of the main window"""# {{{
         return WindowDrawState(self.stdscr, self.on_draw)# }}}
 
-    def on_draw(self, _) -> bool:# {{{
-        """Callback for drawing"""
+    def on_draw(self, _) -> bool:
+        """Callback for drawing"""# {{{
         self.stdscr.erase()
         self.stdscr.noutrefresh()
         for child in self.children:
@@ -249,40 +248,40 @@ class MainWindow:
         self.move_cursor(self.stdcurs)
         return False# }}}
 
-    def move_cursor(self, cursor: Cursor):# {{{
-        """Move the screen cursor to the specified cursor position"""
+    def move_cursor(self, cursor: Cursor):
+        """Move the screen cursor to the specified cursor position"""# {{{
         win_move_cursor(self._stdscr, cursor)# }}}
 
-    def add_child(self, windraw: WindowDrawState, pv: PadView | None = None):# {{{
-        """Add a child to the main window draw stack"""
+    def add_child(self, windraw: WindowDrawState, pv: PadView | None = None):
+        """Add a child to the main window draw stack"""# {{{
         self.children.append((windraw, pv))# }}}
 
-    def add_mapping(self, key: Key, callback: Callable[[], None]) -> bool:# {{{
-        '''Return False if the key is already assigned, in which case, remove
+    def add_mapping(self, key: Key, callback: Callable[[], None]) -> bool:
+        '''Return False if the key is already assigned, in which case, remove# {{{
         the existing mapping and add the new one; otherwise return True'''
         if key in self.keymap:
             return False
         self.keymap[key] = callback
         return True# }}}
 
-    def remove_mapping(self, key: Key) -> Callable[[], None] | None:# {{{
-        '''Return callback if key was removed, otherwise None'''
+    def remove_mapping(self, key: Key) -> Callable[[], None] | None:
+        '''Return callback if key was removed, otherwise None'''# {{{
         if key not in self.keymap:
             return None
         callback = self.keymap[key]
         del self.keymap[key]
         return callback# }}}
 
-    def refresh(self):# {{{
-        """Refresh the main window"""
+    def refresh(self):
+        """Refresh the main window"""# {{{
         windraw_refresh(self.stddraw)# }}}
 
-    def quit(self):# {{{
-        """Quit the mainloop"""
+    def quit(self):
+        """Quit the mainloop"""# {{{
         self.is_running = False# }}}
 
-    def mainloop(self):# {{{
-        """Run the application mainloop
+    def mainloop(self):
+        """Run the application mainloop# {{{
 
         Note that this may raise KeyboardInterrupt in certain terminal modes."""
         self.is_running = True
@@ -310,8 +309,8 @@ class DisplayRestore:
     pv: PadView
     post_restore: Callable[[], None]
 
-def padview_clamp(pv: PadView) -> tuple[int,int,int,int,int,int]:# {{{
-    '''Provides clamped values for pv.refresh() or pv.noutrefresh()'''
+def padview_clamp(pv: PadView) -> tuple[int,int,int,int,int,int]:
+    '''Provides clamped values for pv.refresh() or pv.noutrefresh()'''# {{{
     py, px = pv.pad_start
     sy, sx = pv.desired_screen_start
     h, w = pv.desired_view_size
@@ -327,8 +326,8 @@ def padview_clamp(pv: PadView) -> tuple[int,int,int,int,int,int]:# {{{
     sx = clamp(sx, smaxx - w)
     return py, px, sy, sx, sy + h, sx + w# }}}
 
-def windraw_noutrefresh(windraw: WindowDrawState, pv: PadView | None = None):# {{{
-    """Invoke drawing callback but hold off on refreshing the screen"""
+def windraw_noutrefresh(windraw: WindowDrawState, pv: PadView | None = None):
+    """Invoke drawing callback but hold off on refreshing the screen"""# {{{
     assert pv is None or id(windraw.win) == id(pv.pad)
     dorefresh = windraw.on_draw(windraw.win) if windraw.on_draw is not None else True
     if pv is None and dorefresh:
@@ -336,14 +335,14 @@ def windraw_noutrefresh(windraw: WindowDrawState, pv: PadView | None = None):# {
     elif dorefresh:
         windraw.win.noutrefresh(*padview_clamp(pv)) # }}}
 
-def windraw_refresh(windraw: WindowDrawState, pv: PadView | None = None):# {{{
-    """Invoke drawing callback and refresh the screen"""
+def windraw_refresh(windraw: WindowDrawState, pv: PadView | None = None):
+    """Invoke drawing callback and refresh the screen"""# {{{
     curses.update_lines_cols()
     windraw_noutrefresh(windraw, pv)
     curses.doupdate()# }}}
 
-def utf8_len(byte0: int) -> int:# {{{
-    '''Return the expected length of a UTF-8 code point in bytes given the first byte
+def utf8_len(byte0: int) -> int:
+    '''Return the expected length of a UTF-8 code point in bytes given the first byte# {{{
 
     Note: this function does not decode the code point, nor does it check if the first
     byte is valid; it just naively checks value ranges in the most significant four bits'''
@@ -359,8 +358,8 @@ def utf8_len(byte0: int) -> int:# {{{
 IDLE_KEY_NAME = "IDLE"
 IDLE_KEY = Key(IDLE_KEY_NAME, special = True)
 
-def getkbytes(win: curses.window) -> list[int]:# {{{
-    """Fetch next keyboard bytes from user typeahead"""
+def getkbytes(win: curses.window) -> list[int]:
+    """Fetch next keyboard bytes from user typeahead"""# {{{
     kbytes = []
     key = win.getch()
     kbytes.append(key)
@@ -369,8 +368,8 @@ def getkbytes(win: curses.window) -> list[int]:# {{{
         kbytes.append(key)
     return kbytes# }}}
 
-def getkbytes_blocking(win: curses.window) -> list[int]:# {{{
-    """Fetch next keyboard bytes from user with blocking call"""
+def getkbytes_blocking(win: curses.window) -> list[int]:
+    """Fetch next keyboard bytes from user with blocking call"""# {{{
     byte0 = win.getch()
     assert byte0 < curses.KEY_MAX
     if byte0 == -1:
@@ -387,13 +386,13 @@ def getkbytes_blocking(win: curses.window) -> list[int]:# {{{
         i -= 1
     return kbytes # }}}
 
-def unctrl(byte: int) -> str:# {{{
-    '''Unwraps curses' '^C' to 'C'; used for constructing Key objects'''
+def unctrl(byte: int) -> str:
+    '''Unwraps curses' '^C' to 'C'; used for constructing Key objects'''# {{{
     return cascii.unctrl(byte)[1] # }}}
 
 # TODO refactor to reduce amount of return statements
-def key_from_bytes(xs: list[int]) -> Key | None:# {{{
-    """Convert raw keyboard bytes to a known Key object, or None if a valid key
+def key_from_bytes(xs: list[int]) -> Key | None:
+    """Convert raw keyboard bytes to a known Key object, or None if a valid key# {{{
     could not be processed from the input bytes"""
     assert len(xs) > 0
     x = xs[0]
@@ -417,13 +416,13 @@ def key_from_bytes(xs: list[int]) -> Key | None:# {{{
     elif cascii.isctrl(x):
         result = Key(unctrl(x), ctrl = True)
     else:
-        result = Key(chr(x))# }}}
-    return result
+        result = Key(chr(x))
+    return result# }}}
 
 SPECIAL_KEYS = tuple(m for m in dir(curses) if m.startswith("KEY_"))
 
-def askey(ch: str) -> Key:# {{{
-    """Represent unicode character as a user key input"""
+def askey(ch: str) -> Key:
+    """Represent unicode character as a user key input"""# {{{
     if ch == IDLE_KEY_NAME:
         return IDLE_KEY
     if ch in SPECIAL_KEYS:
@@ -442,8 +441,8 @@ def askey(ch: str) -> Key:# {{{
         return Key(ch[2], alt = True)
     return Key(ch) # }}}
 
-def win_addlines(win: curses.window, lines: list[str], y: int = 0, x: int = 0):# {{{
-    """Add lines to curses window"""
+def win_addlines(win: curses.window, lines: list[str], y: int = 0, x: int = 0):
+    """Add lines to curses window"""# {{{
     maxy, maxx = win.getmaxyx()
     for line in lines:
         win.addstr(y, x, line[:maxx + x + 1])
@@ -451,8 +450,8 @@ def win_addlines(win: curses.window, lines: list[str], y: int = 0, x: int = 0):#
         if y > maxy:
             break # }}}
 
-def win_move_cursor(win: curses.window, cursor: Cursor):# {{{
-    """Move screen cursor to specified cursor position relative to the
+def win_move_cursor(win: curses.window, cursor: Cursor):
+    """Move screen cursor to specified cursor position relative to the# {{{
     specified window"""
     cy, cx = cursor.cursor
     if cy < 0 or cy > curses.LINES - 1 or cx < 0 or cx > curses.COLS - 1:
@@ -461,12 +460,12 @@ def win_move_cursor(win: curses.window, cursor: Cursor):# {{{
         curses.curs_set(1)
         win.move(cy, cx) # }}}
 
-def create_display_restore(# {{{
+def create_display_restore(
         stdwin: MainWindow,
         windraw: WindowDrawState,
         pv: PadView,
         post_restore: Callable[[], None]) -> DisplayRestore:
-    """Create a restore point for a MainWindow"""
+    """Create a restore point for a MainWindow"""# {{{
     return DisplayRestore(
             stdwin,
             stdwin.keymap,
@@ -474,8 +473,8 @@ def create_display_restore(# {{{
             pv,
             post_restore)# }}}
 
-def restore_display(dp: DisplayRestore):# {{{
-    """Restore display from restore point"""
+def restore_display(dp: DisplayRestore):
+    """Restore display from restore point"""# {{{
     dp.stdwin.keymap = dp.keymap
     dp.windraw.on_draw = None
     dp.pv.desired_view_size = (0, 0)
@@ -483,13 +482,13 @@ def restore_display(dp: DisplayRestore):# {{{
     dp.post_restore()
     dp.stdwin.refresh()# }}}
 
-def start_curses(# {{{
+def start_curses(
         stdscr: curses.window,
         init_fn: Callable[[curses.window], None],
         main_fn: Callable[[MainWindow], T],
         *args,
         **kwargs) -> T:
-    """Initialise curses context and calls a main function with a constructed
+    """Initialise curses context and calls a main function with a constructed# {{{
     MainWindow object. Any optional arguments passed to the MainWindow
     constructor are forwarded to the main function via the forwarding_args
     mechanism. Refer to MainWindow to see what keynames are consumed by its

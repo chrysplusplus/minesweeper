@@ -9,7 +9,7 @@ TODO
 - [X] Debug updates after any key press
 - [ ] Ensure game padview is large enough for the grid
 - [ ] Implement game logic
-- [ ] Change vim-fold style
+- [X] Change vim-fold style
 """
 
 import curses
@@ -30,7 +30,6 @@ from util import clamp, same, label_tuple, compose2, transpose_2d
 @dataclass(slots = True)
 class QuitEvent(tui.BaseEvent):
     """Event class for quitting the program"""
-    ...
 
 @dataclass(slots = True)
 class MovementEvent(tui.BaseEvent):
@@ -40,8 +39,8 @@ class MovementEvent(tui.BaseEvent):
     y: int = 0
     relative: bool = True
 
-    def get_moved_coords_from(self, from_coords: tuple[int, int]) -> tuple[int, int]:# {{{
-        """Return the new coords after movement from initial coords"""
+    def get_moved_coords_from(self, from_coords: tuple[int, int]) -> tuple[int, int]:
+        """Return the new coords after movement from initial coords"""# {{{
         fromx, fromy = from_coords
         if self.relative:
             return (fromx + self.x, fromy + self.y)
@@ -50,12 +49,10 @@ class MovementEvent(tui.BaseEvent):
 @dataclass(slots = True)
 class SelectEvent(tui.BaseEvent):
     """Event class for activating the current selection"""
-    ...
 
 @dataclass(slots = True)
 class PlaceFlagEvent(tui.BaseEvent):
     """Event class for placing flags at the current selection"""
-    ...
 
 class Tile(Flag):
     """Flag Enumeration of grid tiles"""
@@ -68,56 +65,56 @@ class TileGrid:
     """Class representing grid of tiles"""
     __slots__ = ("_grid", "_grid_size", "_mines", "_flags")
 
-    def __init__(self, grid: list[Tile], grid_size: tuple[int, int], mines: int):# {{{
-        assert mines < (grid_size[0] * grid_size[1])
+    def __init__(self, grid: list[Tile], grid_size: tuple[int, int], mines: int):
+        assert mines < (grid_size[0] * grid_size[1])# {{{
         self._grid: list[Tile] = grid
         self._grid_size = grid_size
         self._mines = mines
         self._flags = 0# }}}
 
-    def __iter__(self):# {{{
-        for i, tile in enumerate(self._grid):
+    def __iter__(self):
+        for i, tile in enumerate(self._grid):# {{{
             yield (divmod(i, self._grid_size[0]), tile) # }}}
 
     @property
-    def grid_size(self):# {{{
-        """Size of the grid, read-only"""
+    def grid_size(self):
+        """Size of the grid, read-only"""# {{{
         return self._grid_size # }}}
 
     @property
-    def mines(self):# {{{
-        """Number of mines remaining in the grid, read-only"""
-        return self._mines - self._flags# }}}
+    def mines(self):
+        """Number of mines remaining in the grid, read-only"""# {{{
+        return self._mines - self._flags#}}}
 
-    def get_tile(self, coord: tuple[int, int]) -> Tile:# {{{
-        """Get tile at coordinate"""
+    def get_tile(self, coord: tuple[int, int]) -> Tile:
+        """Get tile at coordinate"""# {{{
         width, height = self._grid_size
         x, y = coord
         assert width > x >= 0 and height > y >= 0
         return self._grid[y * width + x] # }}}
 
-    def set_tile(self, coord: tuple[int, int], tile: Tile):# {{{
-        """Set tile at coordinate"""
+    def set_tile(self, coord: tuple[int, int], tile: Tile):
+        """Set tile at coordinate"""# {{{
         width, height = self._grid_size
         x, y = coord
         assert width > x >= 0 and height > y >= 0
         self._check_flag(coord, tile)
         self._grid[y * width + x] = tile # }}}
 
-    def get_maybe_tile(self, coord: tuple[int, int]) -> Tile | None:# {{{
-        """Get tile at coordinate if one exists there"""
+    def get_maybe_tile(self, coord: tuple[int, int]) -> Tile | None:
+        """Get tile at coordinate if one exists there"""# {{{
         width, height = self._grid_size
         x, y = coord
         return self._grid[y * width + x] \
                 if width > x >= 0 and height > y >= 0 \
                 else None# }}}
 
-    def empty(self) -> bool:# {{{
-        """Return True if the grid is empty and unpopulated"""
+    def empty(self) -> bool:
+        """Return True if the grid is empty and unpopulated"""# {{{
         return len(self._grid) == 0# }}}
 
-    def populate_except_for(self, *except_coords: tuple[int, int]):# {{{
-        """Populate grid from grid_size and mines, avoiding specified coords"""
+    def populate_except_for(self, *except_coords: tuple[int, int]):
+        """Populate grid from grid_size and mines, avoiding specified coords"""# {{{
         width, height = self._grid_size
         locations = [(x, y) for x in range(width) for y in range(height)
                      if (x, y) not in except_coords]
@@ -128,14 +125,14 @@ class TileGrid:
             self._grid[miney * width + minex] = Tile.MINE# }}}
 
     def _check_flag(self, coord: tuple[int, int], new_tile: Tile):
-        """Determine whether changing tile affects the flag count"""
+        """Determine whether changing tile affects the flag count"""# {{{
         x, y = coord
         width, _ = self._grid_size
         old_tile = self._grid[y * width + x]
         if Tile.FLAG in old_tile and Tile.FLAG not in new_tile:
             self._flags -= 1
         elif Tile.FLAG not in old_tile and Tile.FLAG in new_tile:
-            self._flags += 1
+            self._flags += 1# }}}
 
 class DebugPanel:
     """Debug window that can override MainWindow on_post_key to update on every
@@ -143,8 +140,8 @@ class DebugPanel:
     __slots__ = ("stdwin", "window", "padview", "drawstate", "is_visible", "update_callback",
                  "track_map")
 
-    def __init__(self, stdwin: tui.MainWindow):# {{{
-        self.stdwin = stdwin
+    def __init__(self, stdwin: tui.MainWindow):
+        self.stdwin = stdwin# {{{
         self.window = curses.newpad(100, 100)
         self.padview = tui.PadView(self.window)
         self.drawstate = tui.WindowDrawState(self.window)
@@ -155,8 +152,8 @@ class DebugPanel:
         self.update_callback: Callable[[], None] | None = None
         self.track_map = {} # }}}
 
-    def on_draw(self, win: curses.window) -> bool:# {{{
-        """Callback for drawing the window"""
+    def on_draw(self, win: curses.window) -> bool:
+        """Callback for drawing the window"""# {{{
         pv = self.padview
         assert same(pv.pad, win)
         win.erase()
@@ -181,38 +178,38 @@ class DebugPanel:
         pv.desired_view_size = (y, w)
         return True# }}}
 
-    def on_update(self):# {{{
-        """Callback when enabled for updating after each keypress"""
+    def on_update(self):
+        """Callback when enabled for updating after each keypress"""# {{{
         if self.update_callback is not None:
             self.update_callback()
 
         tui.windraw_refresh(self.drawstate, self.padview)
         self.stdwin.move_cursor(self.stdwin.stdcurs)# }}}
 
-    def track(self, key: str, value: Any):# {{{
-        """Add value or callable to map of tracked values"""
+    def track(self, key: str, value: Any):
+        """Add value or callable to map of tracked values"""# {{{
         self.track_map[key] = value# }}}
 
-    def untrack(self, key: str) -> Any:# {{{
-        """Remove and return tracked value"""
+    def untrack(self, key: str) -> Any:
+        """Remove and return tracked value"""# {{{
         return self.track_map.pop(key) if key in self.track_map else None# }}}
 
-    def enable(self):# {{{
-        """Enable the debug display"""
+    def enable(self):
+        """Enable the debug display"""# {{{
         self.update_callback = self.stdwin.on_post_key
         self.stdwin.on_post_key = self.on_update
         self.is_visible = True
         self.stdwin.refresh()# }}}
 
-    def disable(self):# {{{
-        """Disable the debug display"""
+    def disable(self):
+        """Disable the debug display"""# {{{
         self.stdwin.on_post_key = self.update_callback
         self.update_callback = None
         self.is_visible = False
         self.stdwin.refresh()# }}}
 
-    def toggle(self):# {{{
-        """Toggle the state of the debug display"""
+    def toggle(self):
+        """Toggle the state of the debug display"""# {{{
         if self.is_visible:
             self.disable()
         else:
@@ -222,9 +219,8 @@ class GameView:
     """Class for drawing the Minesweeper grid and handling game logic"""
     __slots__ = ("stdwin", "event_handler", "selection", "grid", "window", "padview", "drawstate")
 
-    def __init__(
-            self, stdwin: tui.MainWindow, event_handler: tui.EventHandler, grid: TileGrid):# {{{
-        self.stdwin = stdwin
+    def __init__(self, stdwin: tui.MainWindow, event_handler: tui.EventHandler, grid: TileGrid):
+        self.stdwin = stdwin# {{{
         self.event_handler = event_handler
         self.grid = grid
 
@@ -236,8 +232,8 @@ class GameView:
         self.drawstate.on_draw = self.on_draw
         self.stdwin.add_child(self.drawstate, self.padview)# }}}
 
-    def on_draw(self, win: curses.window) -> bool:# {{{
-        """Callback for drawing"""
+    def on_draw(self, win: curses.window) -> bool:
+        """Callback for drawing"""# {{{
         win.erase()
         tui.win_addlines(win, gridlines(self.grid))
 
@@ -250,16 +246,16 @@ class GameView:
 
         return True# }}}
 
-    def on_grid_selection_changed(self, e: MovementEvent):# {{{
-        """Callback for updating grid selection"""
+    def on_grid_selection_changed(self, e: MovementEvent):
+        """Callback for updating grid selection"""# {{{
         stdwin = self.stdwin
         self.selection = wrap_coords_to_grid(
                 e.get_moved_coords_from(self.selection), self.grid.grid_size)
         stdwin.stdcurs = get_grid_view_screen_cursor(self.padview, self.selection)
         stdwin.move_cursor(stdwin.stdcurs)# }}}
 
-    def on_select(self, _):# {{{
-        """Callback for activating current selection"""
+    def on_select(self, _):
+        """Callback for activating current selection"""# {{{
         if self.grid.empty():
             self.grid.populate_except_for(
                     *iter_3x3_area_coords(self.grid.grid_size, self.selection))
@@ -268,8 +264,8 @@ class GameView:
         tui.windraw_refresh(self.drawstate, self.padview)
         self.stdwin.move_cursor(self.stdwin.stdcurs)# }}}
 
-    def on_flag(self, _):# {{{
-        """Callback for toggling flag at the current grid selection"""
+    def on_flag(self, _):
+        """Callback for toggling flag at the current grid selection"""# {{{
         if self.grid.empty():
             return
 
@@ -283,14 +279,14 @@ class GameView:
         self.update_mine_counter(self.window)
         self.refresh()# }}}
 
-    def bind_events(self):# {{{
-        """Bind game events"""
+    def bind_events(self):
+        """Bind game events"""# {{{
         self.event_handler.bind(MovementEvent, self.on_grid_selection_changed)
         self.event_handler.bind(SelectEvent, self.on_select)
         self.event_handler.bind(PlaceFlagEvent, self.on_flag)# }}}
 
-    def resize(self):# {{{
-        """Resize the window view to fill the available space"""
+    def resize(self):
+        """Resize the window view to fill the available space"""# {{{
         height, width = scale_grid_coords_to_screen_offset(self.grid.grid_size)
         width = width - 1
         width = clamp(width, curses.COLS - 3)
@@ -300,8 +296,8 @@ class GameView:
         self.padview.desired_screen_start = (starty, startx)
         self.padview.desired_view_size = (height, width)# }}}
 
-    def _reveal_tile_at(self, coords: tuple[int, int]):# {{{
-        """Reveal the tile at the specified coord"""
+    def _reveal_tile_at(self, coords: tuple[int, int]):
+        """Reveal the tile at the specified coord"""# {{{
         tile = self.grid.get_tile(coords)
         if Tile.SEEN in tile or Tile.FLAG in tile:
             return
@@ -317,15 +313,15 @@ class GameView:
             for neighbour in neighbour_coords:
                 self._reveal_tile_at(neighbour)# }}}
 
-    def focus_cursor(self):# {{{
-        """Focus screen cursor to grid selection"""
+    def focus_cursor(self):
+        """Focus screen cursor to grid selection"""# {{{
         # TODO check if gameview has focus
         stdwin = self.stdwin
         stdwin.stdcurs = get_grid_view_screen_cursor(self.padview, self.selection)
         stdwin.move_cursor(stdwin.stdcurs)# }}}
 
-    def mark_tile_at(self, coords: tuple[int, int]):# {{{
-        """Mark the tile at the specified coords to be updated on the next refresh"""
+    def mark_tile_at(self, coords: tuple[int, int]):
+        """Mark the tile at the specified coords to be updated on the next refresh"""# {{{
         w, h = self.grid.grid_size
         x, y = coords
         assert 0 <= x < w and 0 <= y < h
@@ -334,16 +330,16 @@ class GameView:
         self.window.addch(*scale_grid_coords_to_screen_offset(coords), symbol)# }}}
 
     def update_mine_counter(self, win: curses.window):
-        """Update the mine counter line"""
-        win.addstr(get_grid_height(self.grid.grid_size), 0, f'Mines left: {self.grid.mines}', ATTR_CYAN)
+        """Update the mine counter line"""# {{{
+        win.addstr(get_grid_height(self.grid.grid_size), 0, f'Mines left: {self.grid.mines}', ATTR_CYAN)# }}}
 
-    def refresh(self):# {{{
-        """Update the window with any marked tiles"""
+    def refresh(self):
+        """Update the window with any marked tiles"""# {{{
         self.window.refresh(*tui.padview_clamp(self.padview))
         self.stdwin.move_cursor(self.stdwin.stdcurs)# }}}
 
-    def map_game_controls(self):# {{{
-        """Map keys for game controls"""
+    def map_game_controls(self):
+        """Map keys for game controls"""# {{{
         stdwin = self.stdwin
         event_handler = self.event_handler
         stdwin.add_mapping(tui.askey(" "), partial(event_handler.enqueue, SelectEvent()))
@@ -363,8 +359,8 @@ class MinesweeperApp:
     __slots__ = ("stdwin", "event_handler", "gameview", "keyhelp", "overlay", "titlebar",
                  "debug_panel")
 
-    def __init__(self, stdwin: tui.MainWindow):# {{{
-        self.stdwin = stdwin
+    def __init__(self, stdwin: tui.MainWindow):
+        self.stdwin = stdwin# {{{
         self.event_handler = tui.EventHandler()
         self.stdwin.on_post_key = self.event_handler.process
 
@@ -386,22 +382,22 @@ class MinesweeperApp:
         self.gameview.map_game_controls()
         self.stdwin.mainloop() # }}}
 
-    def on_resize(self):# {{{
-        """Callback for window resizing"""
+    def on_resize(self):
+        """Callback for window resizing"""# {{{
         curses.update_lines_cols()
         self.gameview.resize()
         self.gameview.focus_cursor()
         self.stdwin.refresh()# }}}
 
-    def on_reset(self):# {{{
-        """Callback for window reset/refresh"""
+    def on_reset(self):
+        """Callback for window reset/refresh"""# {{{
         self.stdwin.stdscr.clear()
         self.stdwin.refresh()# }}}
 
     # NOTE causes issue with resizing after breakpoint is triggered
     # likely due to switching modes without them being correctly set up
-    def on_breakpoint(self):# {{{
-        """Callback for debug breakpoint"""
+    def on_breakpoint(self):
+        """Callback for debug breakpoint"""# {{{
         self.stdwin.stdscr.move(0, 0)
         self.stdwin.stdscr.clrtobot()
         self.stdwin.stdscr.refresh()
@@ -411,12 +407,12 @@ class MinesweeperApp:
         self.stdwin.stdscr.clear()
         self.stdwin.refresh()# }}}
 
-    def on_quit(self, _):# {{{
-        """Callback for quitting mainloop"""
+    def on_quit(self, _):
+        """Callback for quitting mainloop"""# {{{
         self.stdwin.quit()# }}}
 
-    def map_window(self): #{{{
-        """Map the application keys for controlling the window state, such as
+    def map_window(self): #
+        """Map the application keys for controlling the window state, such as# {{{
         screen refreshing, debug capabilities and quitting"""
 
         self.stdwin.add_mapping(tui.askey("KEY_RESIZE"), self.on_resize)
@@ -429,8 +425,8 @@ class MinesweeperApp:
         self.stdwin.add_mapping(tui.askey("C-C"), on_quit)
         self.stdwin.add_mapping(tui.askey("q"), on_quit) # }}}
 
-    def map_selection(self):# {{{
-        """Map the directional keys to emit movement events"""
+    def map_selection(self):
+        """Map the directional keys to emit movement events"""# {{{
         stdwin = self.stdwin
         event_handler = self.event_handler
         stdwin.add_mapping(tui.askey("k"),
@@ -462,8 +458,8 @@ class MinesweeperApp:
         stdwin.add_mapping(tui.askey("C-J"),
                            partial(event_handler.enqueue, SelectEvent()))# }}}
 
-    def track_values(self):# {{{
-        """Initialise the debug panel with tracked values"""
+    def track_values(self):
+        """Initialise the debug panel with tracked values"""# {{{
         self.debug_panel.track("cursor", lambda: self.stdwin.stdcurs)
         self.debug_panel.track("grid_coord", compose2(
             partial(getattr, self.gameview, "selection"), label_xycoords))
@@ -485,8 +481,8 @@ ATTR_RED:       int # initialised by init_curses
 ATTR_WHITE:     int # initialised by init_curses
 ATTR_YELLOW:    int # initialised by init_curses
 
-def init_curses(stdscr: curses.window):# {{{
-    """Initialise the curses library"""
+def init_curses(stdscr: curses.window):
+    """Initialise the curses library"""# {{{
     curses.raw()
     curses.use_default_colors()
 
@@ -509,29 +505,29 @@ def init_curses(stdscr: curses.window):# {{{
     ATTR_WHITE    = curses.color_pair(6)
     ATTR_YELLOW   = curses.color_pair(7) # }}}
 
-def empty_tile_grid(grid_size: tuple[int, int], mines: int) -> TileGrid:# {{{
-    """Create an empty grid"""
+def empty_tile_grid(grid_size: tuple[int, int], mines: int) -> TileGrid:
+    """Create an empty grid"""# {{{
     return TileGrid([], grid_size, mines) # }}}
 
-def iter_conds_from_tiles(tiles: Iterable[Tile]) -> Iterable[bool]:# {{{
-    """Return an iterator of barrier conditions for a collection of tiles"""
+def iter_conds_from_tiles(tiles: Iterable[Tile]) -> Iterable[bool]:
+    """Return an iterator of barrier conditions for a collection of tiles"""# {{{
     for first_tile, second_tile in pairwise(tiles):
         yield Tile.SEEN not in first_tile or Tile.SEEN not in second_tile# }}}
 
-def iter_elems_from_grid_y(grid: TileGrid, y: int) -> Iterable[str]:# {{{
-    """Return gridline elements for the specified y-coordinate in grid"""
+def iter_elems_from_grid_y(grid: TileGrid, y: int) -> Iterable[str]:
+    """Return gridline elements for the specified y-coordinate in grid"""# {{{
     width, _ = grid.grid_size
     conds = iter_conds_from_tiles(grid.get_tile((x, y)) for x in range(width))
     return (L_ns if cond else " " for cond in conds)# }}}
 
-def iter_elems_from_grid_x(grid: TileGrid, x: int) -> Iterable[str]:# {{{
-    """Return gridline elements for the specified x-coordinate in grid"""
+def iter_elems_from_grid_x(grid: TileGrid, x: int) -> Iterable[str]:
+    """Return gridline elements for the specified x-coordinate in grid"""# {{{
     _, height = grid.grid_size
     conds = iter_conds_from_tiles(grid.get_tile((x, y)) for y in range(height))
     return (L_ew if cond else " " for cond in conds)# }}}
 
-def empty_gridlines(grid_size: tuple[str, str]):# {{{
-    """Return a list of strings representing an empty grid of specified size"""
+def empty_gridlines(grid_size: tuple[str, str]):
+    """Return a list of strings representing an empty grid of specified size"""# {{{
     width, height = grid_size
     line_format = "{outer_left}" + "{separator}".join(repeat("{tile}" * 3, width))\
             + "{outer_right}"
@@ -555,18 +551,18 @@ def empty_gridlines(grid_size: tuple[str, str]):# {{{
 
 CELL_WIDTH = 3
 
-def format_row_from_elems(elems: Iterable[str]) -> str:# {{{
-    """Format a gridline row from row elements"""
+def format_row_from_elems(elems: Iterable[str]) -> str:
+    """Format a gridline row from row elements"""# {{{
     cell = " " * CELL_WIDTH
     inner = cell.join(elems)
     return f"{L_ns}{cell}{inner}{cell}{L_ns}"# }}}
 
-def is_barrier(ch: str) -> bool:# {{{
-    """Return True if character is considered a barrier symbol"""
+def is_barrier(ch: str) -> bool:
+    """Return True if character is considered a barrier symbol"""# {{{
     return ch != " "# }}}
 
-def join_barriers(north: str, east: str, south: str, west: str) -> str:# {{{
-    """Return symbol joining barriers in four directions"""
+def join_barriers(north: str, east: str, south: str, west: str) -> str:
+    """Return symbol joining barriers in four directions"""# {{{
     n = is_barrier(north)
     e = is_barrier(east)
     s = is_barrier(south)
@@ -596,21 +592,20 @@ def join_barriers(north: str, east: str, south: str, west: str) -> str:# {{{
         result = L_ew
     return result# }}}
 
-def format_grid_top_border(elems: Iterable[str]) -> str:# {{{
-    """Format top gridline border from row elements"""
+def format_grid_top_border(elems: Iterable[str]) -> str:
+    """Format top gridline border from row elements"""# {{{
     cell = L_ew * CELL_WIDTH
     inner = cell.join(L_esw if is_barrier(e) else L_ew for e in elems)
     return f"{C_es}{cell}{inner}{cell}{C_sw}"# }}}
 
-def format_grid_bottom_border(elems: Iterable[str]) -> str:# {{{
-    """Format bottom gridline border from row elements"""
+def format_grid_bottom_border(elems: Iterable[str]) -> str:
+    """Format bottom gridline border from row elements"""# {{{
     cell = L_ew * CELL_WIDTH
     inner = cell.join(L_new if is_barrier(e) else L_ew for e in elems)
     return f"{C_ne}{cell}{inner}{cell}{C_nw}"# }}}
 
-def format_sep_line(# {{{
-        sep: Iterable[str], above_row: Iterable[str], below_row: Iterable[str]) -> str:
-    """Format seperator line between rows"""
+def format_sep_line(sep: Iterable[str], above_row: Iterable[str], below_row: Iterable[str]) -> str:
+    """Format seperator line between rows"""# {{{
     isep = iter(sep)
     before_elem = next(isep)
     sep_line = L_nes if is_barrier(before_elem) else L_ns
@@ -624,8 +619,8 @@ def format_sep_line(# {{{
     sep_line += L_nsw if is_barrier(before_elem) else L_ns
     return sep_line# }}}
 
-def gridlines(grid: TileGrid) -> list[str]:# {{{
-    """Return a list of strings corresponding to the text lines representing
+def gridlines(grid: TileGrid) -> list[str]:
+    """Return a list of strings corresponding to the text lines representing# {{{
     the grid"""
     if grid.empty():
         return empty_gridlines(grid.grid_size)
@@ -647,17 +642,16 @@ def gridlines(grid: TileGrid) -> list[str]:# {{{
     lines.append(format_grid_bottom_border(above_row))
     return lines# }}}
 
-def label_yxcoords(coords: tuple[int, int]) -> str:# {{{
-    """Format a string with coordinates in y-x order"""
+def label_yxcoords(coords: tuple[int, int]) -> str:
+    """Format a string with coordinates in y-x order"""# {{{
     return label_tuple(coords, "y", "x") # }}}
 
-def label_xycoords(coords: tuple[int, int]) -> str:# {{{
-    """Format a string with coordinates in x-y order"""
+def label_xycoords(coords: tuple[int, int]) -> str:
+    """Format a string with coordinates in x-y order"""# {{{
     return label_tuple(coords, "x", "y") # }}}
 
-def iter_3x3_area_coords(# {{{
-        grid_size: tuple[int, int], coords: tuple[int, int]) -> Iterable[Tile]:
-    """Return an iterator of coordinates in a 3x3 area cetnered around
+def iter_3x3_area_coords(grid_size: tuple[int, int], coords: tuple[int, int]) -> Iterable[Tile]:
+    """Return an iterator of coordinates in a 3x3 area cetnered around# {{{
     specified coords for a specified grid size"""
     thisx, thisy = coords
     width, height = grid_size
@@ -668,8 +662,8 @@ def iter_3x3_area_coords(# {{{
             if 0 <= x < width and 0 <= y < height:
                 yield (x, y)# }}}
 
-def iter_grid_neighbours(grid: TileGrid, coords: tuple[int, int]) -> Iterable[Tile]:# {{{
-    """Return an iterator of neighbouring tiles to specfied grid coordinates"""
+def iter_grid_neighbours(grid: TileGrid, coords: tuple[int, int]) -> Iterable[Tile]:
+    """Return an iterator of neighbouring tiles to specfied grid coordinates"""# {{{
     thisx, thisy = coords
     for y in (-1, 0, 1):
         for x in (-1, 0, 1):
@@ -680,13 +674,13 @@ def iter_grid_neighbours(grid: TileGrid, coords: tuple[int, int]) -> Iterable[Ti
                 continue
             yield neighbour# }}}
 
-def count_neighbouring_mines(grid: TileGrid, coords: tuple[int, int]) -> int:# {{{
-    """Count the number of mines neighbouring the specified coordinates in the
+def count_neighbouring_mines(grid: TileGrid, coords: tuple[int, int]) -> int:
+    """Count the number of mines neighbouring the specified coordinates in the# {{{
     specified grid"""
     return sum(Tile.MINE in t for t in iter_grid_neighbours(grid, coords))# }}}
 
-def get_symbol_for_coord_from(grid: TileGrid, coords: tuple[int, int]) -> str | None:# {{{
-    """Determine display symbol for grid coordinates"""
+def get_symbol_for_coord_from(grid: TileGrid, coords: tuple[int, int]) -> str | None:
+    """Determine display symbol for grid coordinates"""# {{{
     tile = grid.get_tile(coords)
     symbol: str | None = None
     if Tile.FLAG in tile:
@@ -701,33 +695,32 @@ def get_symbol_for_coord_from(grid: TileGrid, coords: tuple[int, int]) -> str | 
 
     return symbol# }}}
 
-def wrap_coords_to_grid(# {{{
-        coords: tuple[int, int], grid_size: tuple[int, int]) -> tuple[int, int]:
-    """Calculate coordinates wrapped inside a grid"""
+def wrap_coords_to_grid(coords: tuple[int, int], grid_size: tuple[int, int]) -> tuple[int, int]:
+    """Calculate coordinates wrapped inside a grid"""# {{{
     x, y = coords
     w, h = grid_size
     return (x % w, y % h) # }}}
 
-def scale_grid_coords_to_screen_offset(grid_coords: tuple[int, int]) -> tuple[int, int]:# {{{
-    """Scale grid coordinates to offset from the origin of the grid window"""
+def scale_grid_coords_to_screen_offset(grid_coords: tuple[int, int]) -> tuple[int, int]:
+    """Scale grid coordinates to offset from the origin of the grid window"""# {{{
     x, y = grid_coords
     return (2 * y + 1, 4 * x + 2)# }}}
 
-def get_grid_view_screen_cursor(# {{{
+def get_grid_view_screen_cursor(
         grid_view: tui.PadView, selection_coords: tuple[int, int]) -> tui.Cursor:
-    """Calculate screen coordinates for a given coordinate in a grid"""
+    """Calculate screen coordinates for a given coordinate in a grid"""# {{{
     y, x = scale_grid_coords_to_screen_offset(selection_coords)
     starty, startx = grid_view.desired_screen_start
     pady, padx = grid_view.pad_start
-    return tui.Cursor((starty - pady + y, startx - padx + x))# }}}
+    return tui.Cursor((starty - pady + y, startx - padx + x))#}}}
 
 def get_grid_height(grid_size: tuple[int, int]) -> int:
-    """Calculate height of grid in window from its grid size"""
+    """Calculate height of grid in window from its grid size"""# {{{
     _, height = grid_size
-    return 2 * height + 1
+    return 2 * height + 1# }}}
 
-def key_instruction_bar(stdwin: tui.MainWindow, event_handler: tui.EventHandler) -> TextWindow:# {{{
-    """Object for drawing key instructions"""
+def key_instruction_bar(stdwin: tui.MainWindow, event_handler: tui.EventHandler) -> TextWindow:
+    """Object for drawing key instructions"""# {{{
     window = curses.newwin(1, curses.COLS, curses.LINES - 1, 0)
     drawstate = tui.WindowDrawState(window)
 
@@ -748,8 +741,8 @@ def key_instruction_bar(stdwin: tui.MainWindow, event_handler: tui.EventHandler)
             window,
             drawstate)# }}}
 
-def overlay(stdwin: tui.MainWindow, event_handler: tui.EventHandler):# {{{
-    """Object for drawing dialogs overlaying the application"""
+def overlay(stdwin: tui.MainWindow, event_handler: tui.EventHandler):
+    """Object for drawing dialogs overlaying the application"""# {{{
     window = curses.newpad(100, 100)
     padview = tui.PadView(window)
     drawstate = tui.WindowDrawState(window)
@@ -761,8 +754,8 @@ def overlay(stdwin: tui.MainWindow, event_handler: tui.EventHandler):# {{{
             drawstate,
             padview)# }}}
 
-def titlebar(stdwin: tui.MainWindow, event_handler: tui.EventHandler):# {{{
-    """Object for drawing the application titlebar"""
+def titlebar(stdwin: tui.MainWindow, event_handler: tui.EventHandler):
+    """Object for drawing the application titlebar"""# {{{
     window = curses.newwin(1, curses.COLS, 0, 0)
     drawstate = tui.WindowDrawState(window)
 
