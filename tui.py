@@ -159,12 +159,24 @@ class EventHandler:
 
         event_t must be a subclass of BaseEvent
 
-        Returns False is type is already bound"""
+        Returns False if type is already bound"""
         assert issubclass(event_t, BaseEvent)
         if event_t in self.callbacks:
             return False
         self.callbacks[event_t] = callback
         return True # }}}
+
+    def unbind(self, event_t: type) -> bool:
+        """Unbind event type# {{{
+
+        event_t must be a subclass of BaseEvent
+
+        Returns False if type was already unbound"""
+        assert issubclass(event_t, BaseEvent)
+        if event_t not in self.callbacks:
+            return False
+        del self.callbacks[event_t]
+        return True# }}}
 
     def rebind(self,
                event_t: type,
