@@ -11,6 +11,7 @@ TODO
 - [ ] Implement game logic
     - [X] Lose on revealing a mine
     - [X] Win on revealing last empty tile
+    - [ ] Fix reveal display bugs
 - [ ] Implement settings dialog
 - [ ] Add styles for different tiles
 - [X] Change vim-fold style
@@ -25,12 +26,25 @@ from enum import Flag, auto
 from functools import partial
 from itertools import repeat, pairwise
 from random import shuffle
-from typing import Any
+from typing import Any, Protocol
 
 import tui
 from tui import L_ew, L_ns, L_es, L_sw, L_ne, L_nw, L_nes, L_nsw, L_esw, L_new, L_nesw, C_es,\
         C_sw, C_nw, C_ne
 from util import clamp, same, label_tuple, compose2, transpose_2d
+
+class DialogLike(Protocol):
+    """Protocol defining requirements of a dialog-like type"""
+    textwindow: "TextWindow"# {{{
+
+    def on_draw(self, win: curses.window) -> bool:
+        ...
+
+    def bind_events(self):
+        ...
+
+    def unbind_events(self):
+        ...# }}}
 
 @dataclass(slots = True)
 class QuitEvent(tui.BaseEvent):
@@ -67,6 +81,16 @@ class GameLoseEvent(tui.BaseEvent):
 @dataclass(slots = True)
 class GameWinEvent(tui.BaseEvent):
     """Event class for the user winning the game"""
+
+@dataclass(slots = True)
+class OpenDialogEvent(tui.BaseEvent):
+    """Event class for opening a dialog"""
+    dialog: DialogLike
+
+@dataclass(slots = True)
+class DialogRestoreEvent(tui.BaseEvent):
+    """Event class for restoring from a dialog"""
+    dialog: DialogLike
 
 class Tile(Flag):
     """Flag Enumeration of grid tiles"""
@@ -316,18 +340,29 @@ class GameView:
         tui.windraw_refresh(self.drawstate, self.padview)
         self.stdwin.move_cursor(self.stdwin.stdcurs)# }}}
 
+    def on_open_dialog(self, e: OpenDialogEvent):
+        """Callback for opening a dialog box"""
+        raise NotImplementedError
+
+    def on_restore_from_dialog(self, e: DialogRestoreEvent):
+        """Callback for restoring from a closing dialog box"""
+        raise NotImplementedError
+
     def bind_events(self):
         """Bind game events"""# {{{
         self.bind_movement_events()
-        self.bind_game_events()# }}}
+        self.bind_game_events()
+        self.bind_dialog_events()# }}}
 
     def bind_movement_events(self):
         """Bind movement events"""# {{{
         self.event_handler.bind(MovementEvent, self.on_grid_selection_changed)# }}}
 
-    def unbind_movement_events(self):
-        """Unbind movement events"""# {{{
-        self.event_handler.unbind(MovementEvent)# }}}
+    def unbind_movement_events(self) -> bool:
+        """Unbind movement events# {{{
+
+        Return False if movement events are currently inactive"""
+        return self.event_handler.unbind(MovementEvent)# }}}
 
     def bind_game_events(self):
         """Bind game events"""# {{{
@@ -336,12 +371,26 @@ class GameView:
         self.event_handler.bind(GameLoseEvent, self.on_lose)
         self.event_handler.bind(GameWinEvent, self.on_win)# }}}
 
-    def unbind_game_events(self):
-        """Unbind game events"""# {{{
+    def unbind_game_events(self) -> bool:
+        """Unbind game events# {{{
+
+        Return False if game events are not currently active"""
         self.event_handler.unbind(SelectEvent)
         self.event_handler.unbind(PlaceFlagEvent)
         self.event_handler.unbind(GameLoseEvent)
-        self.event_handler.unbind(GameWinEvent)# }}}
+        return self.event_handler.unbind(GameWinEvent)# }}}
+
+    def bind_dialog_events(self):
+        """Bind dialog handling events"""# {{{
+        self.event_handler.bind(OpenDialogEvent, self.on_open_dialog)
+        self.event_handler.bind(DialogRestoreEvent, self.on_restore_from_dialog)# }}}
+
+    def unbind_dialog_events(self) -> bool:
+        """Unbind dialog handling events# {{{
+
+        Return False if dialog handling events are not currently active"""
+        self.event_handler.unbind(OpenDialogEvent)
+        self.event_handler.unbind(DialogRestoreEvent)# }}}
 
     def draw_grid(self, win: curses.window, *, lose_coords: tuple[int, int] | None = None):
         """Draw the grid to the window"""# {{{
@@ -426,6 +475,7 @@ class GameView:
         self.window.refresh(*tui.padview_clamp(self.padview))
         self.stdwin.move_cursor(self.stdwin.stdcurs)# }}}
 
+    # TODO create unmap_game_controls
     def map_game_controls(self):
         """Map keys for game controls"""# {{{
         stdwin = self.stdwin
@@ -443,13 +493,24 @@ class TextWindow:
     padview: tui.PadView | None = None
 
 @dataclass(slots = True)
+class Option:
+    """Parameters for option entry in OptionsDialog"""
+    text: str
+    callback: Callable[[], None] | None = None
+    _: KW_ONLY
+    do_restore: bool = False
+
+@dataclass(slots = True)
 class OptionsDialog:
     """Overlaying options dialog box"""
     textwindow: TextWindow
     message: list[str]
-    options: list[tuple[str, Callable[[], None]]]
+    options: list[Option]
     _: KW_ONLY
     choice: int = 0
+    default_width: int | None = None
+    default_height: int | None = None
+    on_restore: Callable[[], None] | None = None
 
     def on_draw(self, win: curses.window) -> bool:
         """Callback for drawing window"""# {{{
@@ -469,22 +530,61 @@ class OptionsDialog:
 
         y += 1
 
-        for line, _ in self.options:
-            line = line[:maxx]
+        for option in self.options:
+            line = option.text[:maxx]
             width = max(width, len(line))
             win.addstr(y, 0, line)
             y += 1
 
         y -= 1
 
-        sy = (curses.LINES - y) // 2
-        sx = (curses.COLS - width) // 2
+        area_height = self.default_height if self.default_height is not None else curses.LINES
+        area_height = min(area_height, curses.LINES)
+        area_width = self.default_width if self.default_width is not None else curses.COLS
+        area_width = min(area_width, curses.COLS)
+
+        sy = (area_height - y) // 2
+        sx = (area_width - width) // 2
         pv.desired_view_size = (y, width)
         pv.desired_screen_start = (sy, sx)
 
-        cy = len(self.message) + self.choice + sy + 1
-        self.textwindow.stdwin.stdcurs.cursor = (cy, sx)
+        self.reposition_cursor()
         return True# }}}
+
+    def on_selection_changed(self, e: MovementEvent):
+        """Callback to changing the selection"""# {{{
+        delta = e.x if e.x != 0 else e.y
+        self.choice = (self.choice + delta) % len(self.options)
+        self.reposition_cursor()# }}}
+
+    def on_select(self, _):
+        """Callback for selecting an option"""# {{{
+        assert self.choice < len(self.options)
+        callback = self.options[self.choice].callback
+        if callback is not None:
+            callback()
+
+        self.textwindow.event_handler.enqueue(DialogRestoreEvent(self))# }}}
+
+    def reposition_cursor(self):
+        """Reposition the screen cursor to the selection"""# {{{
+        stdwin = self.textwindow.stdwin
+        sy, sx = self.textwindow.padview.desired_screen_start
+        cy = len(self.message) + self.choice + sy + 1
+        stdwin.stdcurs.cursor = (cy, sx)
+        stdwin.move_cursor(stdwin.stdcurs)# }}}
+
+    def bind_events(self):
+        """Bind events for option dialog"""# {{{
+        event_handler = self.textwindow.event_handler
+        event_handler.bind(MovementEvent, self.on_selection_changed)
+        event_handler.bind(SelectEvent, self.on_select)# }}}
+
+    def unbind_events(self):
+        """Unbind events after use"""# {{{
+        event_handler = self.textwindow.event_handler
+        event_handler.unbind(MovementEvent)
+        event_handler.unbind(SelectEvent)# }}}
 
 class MinesweeperApp:
     """Main application class for marshalling initialisation and program state"""
@@ -540,20 +640,20 @@ class MinesweeperApp:
         self.stdwin.refresh()# }}}
 
     def on_quit(self, _):
-        """Callback for viewing the quit dialog"""
+        """Callback for viewing the quit dialog"""# {{{
+        if self.overlay.drawstate.on_draw is not None:
+            return
+
         quit_dialog = OptionsDialog(
                 textwindow = self.overlay,
                 message = ["Are you sure you want to quit?"],
                 options = [
-                    ("Yes", self.do_quit),
-                    ("No", self.on_restore_game)],
-                choice = 1)
+                    Option("Yes", self.do_quit),
+                    Option("No", do_restore = True)],
+                choice = 1,
+                default_height = get_grid_height(self.gameview.grid.grid_size))
 
-        self.overlay.drawstate.on_draw = quit_dialog.on_draw
-        self.stdwin.refresh()
-
-    def on_restore_game(self):
-        raise NotImplementedError
+        self.event_handler.enqueue(OpenDialogEvent(quit_dialog))# }}}
 
     def do_quit(self):
         """Quit the mainloop"""# {{{
@@ -570,7 +670,7 @@ class MinesweeperApp:
 
         self.event_handler.bind(QuitEvent, self.on_quit)
         on_quit = partial(self.event_handler.enqueue, QuitEvent())
-        self.stdwin.add_mapping(tui.askey("C-C"), on_quit)
+        self.stdwin.add_mapping(tui.askey("C-C"), self.do_quit) # TODO change back to on_quit
         self.stdwin.add_mapping(tui.askey("q"), on_quit) # }}}
 
     def map_selection(self):
@@ -910,7 +1010,7 @@ def titlebar(stdwin: tui.MainWindow, event_handler: tui.EventHandler):
     def on_draw(win: curses.window) -> bool:
         win.erase()
         _, maxx = win.getmaxyx()
-        text = "Minesweeper"[:maxx + 1]
+        text = "Minesweeper"[:maxx - 1]
         win.addstr(0, (maxx - len(text)) // 2, text)
         return True
 
