@@ -18,6 +18,7 @@ TODO
 
 import curses
 
+from collections import OrderedDict
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, KW_ONLY
 from enum import Flag, auto
@@ -441,6 +442,50 @@ class TextWindow:
     drawstate: tui.WindowDrawState
     padview: tui.PadView | None = None
 
+@dataclass(slots = True)
+class OptionsDialog:
+    """Overlaying options dialog box"""
+    textwindow: TextWindow
+    message: list[str]
+    options: list[tuple[str, Callable[[], None]]]
+    _: KW_ONLY
+    choice: int = 0
+
+    def on_draw(self, win: curses.window) -> bool:
+        """Callback for drawing window"""# {{{
+        pv = self.textwindow.padview
+        assert pv is not None
+        win.erase()
+        maxy, maxx = win.getmaxyx()
+
+        y = 0
+        width = 0
+
+        for line in self.message:
+            line = line[:maxx]
+            width = max(width, len(line))
+            win.addstr(y, 0, line)
+            y += 1
+
+        y += 1
+
+        for line, _ in self.options:
+            line = line[:maxx]
+            width = max(width, len(line))
+            win.addstr(y, 0, line)
+            y += 1
+
+        y -= 1
+
+        sy = (curses.LINES - y) // 2
+        sx = (curses.COLS - width) // 2
+        pv.desired_view_size = (y, width)
+        pv.desired_screen_start = (sy, sx)
+
+        cy = len(self.message) + self.choice + sy + 1
+        self.textwindow.stdwin.stdcurs.cursor = (cy, sx)
+        return True# }}}
+
 class MinesweeperApp:
     """Main application class for marshalling initialisation and program state"""
     __slots__ = ("stdwin", "event_handler", "gameview", "keyhelp", "overlay", "titlebar",
@@ -495,7 +540,23 @@ class MinesweeperApp:
         self.stdwin.refresh()# }}}
 
     def on_quit(self, _):
-        """Callback for quitting mainloop"""# {{{
+        """Callback for viewing the quit dialog"""
+        quit_dialog = OptionsDialog(
+                textwindow = self.overlay,
+                message = ["Are you sure you want to quit?"],
+                options = [
+                    ("Yes", self.do_quit),
+                    ("No", self.on_restore_game)],
+                choice = 1)
+
+        self.overlay.drawstate.on_draw = quit_dialog.on_draw
+        self.stdwin.refresh()
+
+    def on_restore_game(self):
+        raise NotImplementedError
+
+    def do_quit(self):
+        """Quit the mainloop"""# {{{
         self.stdwin.quit()# }}}
 
     def map_window(self): #
