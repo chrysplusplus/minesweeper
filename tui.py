@@ -310,17 +310,6 @@ class MainWindow:
             if self.on_post_key is not None:
                 self.on_post_key()# }}}
 
-@dataclass(slots = True)
-class DisplayRestore:
-    """Class representing a restore point for MainWindow.
-
-    See create_display_restore and restore_display"""
-    stdwin: MainWindow
-    keymap: KeyMap
-    windraw: WindowDrawState
-    pv: PadView
-    post_restore: Callable[[], None]
-
 def padview_clamp(pv: PadView) -> tuple[int,int,int,int,int,int]:
     '''Provides clamped values for pv.refresh() or pv.noutrefresh()'''# {{{
     py, px = pv.pad_start
@@ -471,28 +460,6 @@ def win_move_cursor(win: curses.window, cursor: Cursor):
     else:
         curses.curs_set(1)
         win.move(cy, cx) # }}}
-
-def create_display_restore(
-        stdwin: MainWindow,
-        windraw: WindowDrawState,
-        pv: PadView,
-        post_restore: Callable[[], None]) -> DisplayRestore:
-    """Create a restore point for a MainWindow"""# {{{
-    return DisplayRestore(
-            stdwin,
-            stdwin.keymap,
-            windraw,
-            pv,
-            post_restore)# }}}
-
-def restore_display(dp: DisplayRestore):
-    """Restore display from restore point"""# {{{
-    dp.stdwin.keymap = dp.keymap
-    dp.windraw.on_draw = None
-    dp.pv.desired_view_size = (0, 0)
-    dp.pv.desired_screen_start = (0, 0)
-    dp.post_restore()
-    dp.stdwin.refresh()# }}}
 
 def start_curses(
         stdscr: curses.window,
