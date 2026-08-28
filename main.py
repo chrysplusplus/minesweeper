@@ -17,7 +17,6 @@ TODO
 
 import curses
 
-from collections import OrderedDict
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, KW_ONLY
 from enum import Flag, auto, Enum
@@ -36,13 +35,13 @@ class DialogLike(Protocol):
     textwindow: "TextWindow"# {{{
 
     def on_draw(self, win: curses.window) -> bool:
-        ...
+        """Callback for drawing"""
 
     def bind_events(self):
-        ...
+        """Bind dialog events"""
 
     def unbind_events(self):
-        ...# }}}
+        """Unbind dialog events"""# }}}
 
 @dataclass(slots = True)
 class MovementEvent(tui.BaseEvent):
@@ -205,8 +204,8 @@ class DebugPanel:
         y = 1
         w = 6
         for key, value in self.track_map.items():
-            value = value() if callable(value) else value
-            line = f"{key}: {value}"[:maxx]
+            value_text = value() if callable(value) else value
+            line = f"{key}: {value_text}"[:maxx]
             w = max(w, len(line))
             win.addstr(y, 0, line, ATTR_WHITE)
             y += 1
@@ -260,6 +259,8 @@ class GameState(Enum):
     WIN = auto()
     LOSE = auto()
 
+# NOTE pylint gives R0904: Too many public methods
+# NOTE pylint gives R0902: Too many instance attributes
 class GameView:
     """Class for drawing the Minesweeper grid and handling game logic"""
     __slots__ = ("stdwin", "event_handler", "selection", "state", "grid", "window", "padview",
@@ -272,7 +273,7 @@ class GameView:
 
         self.selection = (0, 0)
         self.state = GameState.INITIALISING
-        self.last_quit_callback: Callable[[BaseEvent], None] | None = None
+        self.last_quit_callback: Callable[[tui.BaseEvent], None] | None = None
 
         self.window = curses.newpad(100, 100)
         self.padview = tui.PadView(self.window, desired_screen_start = (2, 0))
@@ -477,8 +478,7 @@ class GameView:
 
         neighbour_coords = list(iter_3x3_area_coords(self.grid.grid_size, coords))
         neighbour_tiles = (self.grid.get_tile(neighbour) for neighbour in neighbour_coords)
-        n_neighbouring_mines = sum(Tile.MINE in t for t in neighbour_tiles)
-        if n_neighbouring_mines == 0:
+        if (n_neighbouring_mines := sum(Tile.MINE in t for t in neighbour_tiles)) == 0:
             for neighbour in neighbour_coords:
                 self.reveal_tile_at(neighbour)
 
@@ -493,8 +493,8 @@ class GameView:
             if Tile.MINE not in tile:
                 continue
 
-            tile |= Tile.SEEN
-            self.grid.set_tile(coords, tile)
+            new_tile = tile | Tile.SEEN
+            self.grid.set_tile(coords, new_tile)
             self.mark_tile_at(coords)# }}}
 
     def focus_cursor(self):
@@ -515,7 +515,8 @@ class GameView:
 
     def update_mine_counter(self, win: curses.window):
         """Update the mine counter line"""# {{{
-        win.addstr(get_grid_height(self.grid.grid_size), 0, f'Mines left: {self.grid.mines}', ATTR_CYAN)# }}}
+        win.addstr(get_grid_height(self.grid.grid_size), 0, f'Mines left: {self.grid.mines}',
+                   ATTR_CYAN)# }}}
 
     def refresh(self):
         """Update the window with any marked tiles"""# {{{
@@ -569,15 +570,15 @@ class OptionsDialog:
         pv = self.textwindow.padview
         assert pv is not None
         win.erase()
-        maxy, maxx = win.getmaxyx()
+        _, maxx = win.getmaxyx()
 
         y = 0
         width = 0
 
         for line in self.message:
-            line = line[:maxx]
-            width = max(width, len(line))
-            win.addstr(y, 0, line)
+            trimmed = line[:maxx]
+            width = max(width, len(trimmed))
+            win.addstr(y, 0, trimmed)
             y += 1
 
         y += 1
@@ -715,7 +716,7 @@ class MinesweeperApp:
         """Quit the mainloop"""# {{{
         self.stdwin.quit()# }}}
 
-    def map_window(self): #
+    def map_window(self):
         """Map the application keys for controlling the window state, such as# {{{
         screen refreshing, debug capabilities and quitting
 
@@ -788,7 +789,7 @@ ATTR_RED:       int # initialised by init_curses
 ATTR_WHITE:     int # initialised by init_curses
 ATTR_YELLOW:    int # initialised by init_curses
 
-def init_curses(stdscr: curses.window):
+def init_curses(_):
     """Initialise the curses library"""# {{{
     curses.raw()
     curses.use_default_colors()
@@ -976,8 +977,7 @@ def iter_grid_neighbours(grid: TileGrid, coords: tuple[int, int]) -> Iterable[Ti
         for x in (-1, 0, 1):
             if y == 0 and x == 0:
                 continue
-            neighbour = grid.get_maybe_tile((thisx + x, thisy + y))
-            if neighbour is None:
+            if (neighbour := grid.get_maybe_tile((thisx + x, thisy + y))) is None:
                 continue
             yield neighbour# }}}
 

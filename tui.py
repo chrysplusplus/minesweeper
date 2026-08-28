@@ -1,5 +1,4 @@
-"""
-File: tui.py
+"""File: tui.py
 Author: chrysplusplus
 Date: 2026-06-18
 
@@ -97,7 +96,7 @@ L_nes, L_nsw, L_esw, L_new, L_nesw = linechars[9],  linechars[10], linechars[11]
         linechars[13]
 L_EW, L_NS                         = linechars[15], linechars[16]
 L_Es, L_eS, L_ES                   = linechars[18], linechars[19], linechars[20]
-L_Sw, L_Sw, L_SW                   = linechars[22], linechars[23], linechars[24]
+L_sW, L_Sw, L_SW                   = linechars[22], linechars[23], linechars[24]
 L_nE, L_Ne, L_NE                   = linechars[26], linechars[27], linechars[28]
 L_nW, L_Nw, L_NW                   = linechars[30], linechars[31], linechars[32]
 L_nEs, L_NeS, L_NES                = linechars[34], linechars[35], linechars[36]
@@ -269,15 +268,15 @@ class MainWindow:
         self.children.append((windraw, pv))# }}}
 
     def add_mapping(self, key: Key, callback: Callable[[], None]) -> bool:
-        '''Return False if the key is already assigned, in which case, remove# {{{
-        the existing mapping and add the new one; otherwise return True'''
+        """Return False if the key is already assigned, in which case, remove# {{{
+        the existing mapping and add the new one; otherwise return True"""
         if key in self.keymap:
             return False
         self.keymap[key] = callback
         return True# }}}
 
     def remove_mapping(self, key: Key) -> Callable[[], None] | None:
-        '''Return callback if key was removed, otherwise None'''# {{{
+        """Return callback if key was removed, otherwise None"""# {{{
         if key not in self.keymap:
             return None
         callback = self.keymap[key]
@@ -299,8 +298,7 @@ class MainWindow:
         self.is_running = True
         while self.is_running:
             kbytes = self._getkbytes(self._stdscr)
-            key = key_from_bytes(kbytes)
-            if key is None:
+            if (key := key_from_bytes(kbytes)) is None:
                 continue
             for mapped in self.keymap:
                 if key == mapped:
@@ -311,7 +309,7 @@ class MainWindow:
                 self.on_post_key()# }}}
 
 def padview_clamp(pv: PadView) -> tuple[int,int,int,int,int,int]:
-    '''Provides clamped values for pv.refresh() or pv.noutrefresh()'''# {{{
+    """Provides clamped values for pv.refresh() or pv.noutrefresh()"""# {{{
     py, px = pv.pad_start
     sy, sx = pv.desired_screen_start
     h, w = pv.desired_view_size
@@ -342,17 +340,22 @@ def windraw_refresh(windraw: WindowDrawState, pv: PadView | None = None):
     windraw_noutrefresh(windraw, pv)
     curses.doupdate()# }}}
 
+UNICODE_1_BYTE = 0x80
+UNICODE_2_BYTE = 0xe0
+UNICODE_3_BYTE = 0xf0
+ENSURE_BYTE = 0x100
+
 def utf8_len(byte0: int) -> int:
-    '''Return the expected length of a UTF-8 code point in bytes given the first byte# {{{
+    """Return the expected length of a UTF-8 code point in bytes given the first byte# {{{
 
     Note: this function does not decode the code point, nor does it check if the first
-    byte is valid; it just naively checks value ranges in the most significant four bits'''
-    assert 0 <= byte0 < 0x100
-    if byte0 < 0x80:
+    byte is valid; it just naively checks value ranges in the most significant four bits"""
+    assert 0 <= byte0 < ENSURE_BYTE
+    if byte0 < UNICODE_1_BYTE:
         return 1
-    if byte0 < 0xe0:
+    if byte0 < UNICODE_2_BYTE:
         return 2
-    if byte0 < 0xf0:
+    if byte0 < UNICODE_3_BYTE:
         return 3
     return 4# }}}
 
@@ -388,7 +391,7 @@ def getkbytes_blocking(win: curses.window) -> list[int]:
     return kbytes # }}}
 
 def unctrl(byte: int) -> str:
-    '''Unwraps curses' '^C' to 'C'; used for constructing Key objects'''# {{{
+    """Unwraps curses' '^C' to 'C'; used for constructing Key objects"""# {{{
     return cascii.unctrl(byte)[1] # }}}
 
 # TODO refactor to reduce amount of return statements
@@ -404,7 +407,7 @@ def key_from_bytes(xs: list[int]) -> Key | None:
         result = IDLE_KEY
     elif x >= curses.KEY_MIN and len(xs) == 1:
         result = Key(curses.keyname(x), special = True)
-    elif x > 0x80:
+    elif x > UNICODE_1_BYTE:
         try:
             result = Key(bytes(xs).decode("utf-8"))
         except UnicodeDecodeError:
