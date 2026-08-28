@@ -6,7 +6,6 @@ Author: chrysplusplus
 
 TODO
 
-- [X] Debug updates after any key press
 - [ ] Ensure game padview and screen are large enough for the grid
 - [ ] Implement game logic
     - [X] Lose on revealing a mine
@@ -14,7 +13,6 @@ TODO
     - [ ] Fix reveal display bugs
 - [ ] Implement settings dialog
 - [ ] Add styles for different tiles
-- [X] Change vim-fold style
 """
 
 import curses
@@ -45,10 +43,6 @@ class DialogLike(Protocol):
 
     def unbind_events(self):
         ...# }}}
-
-@dataclass(slots = True)
-class QuitEvent(tui.BaseEvent):
-    """Event class for quitting the program"""
 
 @dataclass(slots = True)
 class MovementEvent(tui.BaseEvent):
@@ -91,6 +85,12 @@ class OpenDialogEvent(tui.BaseEvent):
 class DialogRestoreEvent(tui.BaseEvent):
     """Event class for restoring from a dialog"""
     dialog: DialogLike
+
+@dataclass(slots = True)
+class QuitEvent(tui.BaseEvent):
+    """Event class for the user quitting the program"""
+    _: KW_ONLY
+    confirm_dialog: DialogLike | None = None
 
 class Tile(Flag):
     """Flag Enumeration of grid tiles"""
@@ -263,7 +263,7 @@ class GameState(Enum):
 class GameView:
     """Class for drawing the Minesweeper grid and handling game logic"""
     __slots__ = ("stdwin", "event_handler", "selection", "state", "grid", "window", "padview",
-                 "drawstate")
+                 "drawstate", "last_quit_callback")
 
     def __init__(self, stdwin: tui.MainWindow, event_handler: tui.EventHandler, grid: TileGrid):
         self.stdwin = stdwin# {{{
@@ -272,6 +272,7 @@ class GameView:
 
         self.selection = (0, 0)
         self.state = GameState.INITIALISING
+        self.last_quit_callback: Callable[[BaseEvent], None] | None = None
 
         self.window = curses.newpad(100, 100)
         self.padview = tui.PadView(self.window, desired_screen_start = (2, 0))
@@ -351,12 +352,21 @@ class GameView:
         tui.windraw_refresh(self.drawstate, self.padview)
         self.stdwin.move_cursor(self.stdwin.stdcurs)# }}}
 
+    def on_quit(self, e: QuitEvent):
+        """Callback for the user quitting, display confirmation dialog if# {{{
+        one is provided"""
+        if e.confirm_dialog is None:
+            self.stdwin.quit()
+        else:
+            self.event_handler.enqueue(OpenDialogEvent(e.confirm_dialog))# }}}
+
     def on_open_dialog(self, e: OpenDialogEvent):
         """Callback for opening a dialog box"""# {{{
         if self.state is GameState.INITIALISING:
             return
 
         self.unbind_movement_events()
+        self.unmap_game_controls()
         if self.state not in (GameState.WIN, GameState.LOSE):
             self.unbind_game_events()
 
@@ -370,6 +380,7 @@ class GameView:
         dialog = e.dialog
         dialog.unbind_events()
         self.bind_movement_events()
+        self.map_game_controls()
         if self.state not in (GameState.WIN, GameState.LOSE):
             self.bind_game_events()
 
@@ -415,6 +426,7 @@ class GameView:
 
     def bind_dialog_events(self):
         """Bind dialog handling events"""# {{{
+        self.last_quit_callback = self.event_handler.rebind(QuitEvent, self.on_quit)
         self.event_handler.bind(OpenDialogEvent, self.on_open_dialog)
         self.event_handler.bind(DialogRestoreEvent, self.on_restore_from_dialog)# }}}
 
@@ -422,6 +434,8 @@ class GameView:
         """Unbind dialog handling events# {{{
 
         Return False if dialog handling events are not currently active"""
+        if self.last_quit_callback is not None:
+            self.event_handler.rebind(QuitEvent, self.last_quit_callback)
         self.event_handler.unbind(OpenDialogEvent)
         self.event_handler.unbind(DialogRestoreEvent)# }}}
 
@@ -508,7 +522,6 @@ class GameView:
         self.window.refresh(*tui.padview_clamp(self.padview))
         self.stdwin.move_cursor(self.stdwin.stdcurs)# }}}
 
-    # TODO create unmap_game_controls
     def map_game_controls(self):
         """Map keys for game controls"""# {{{
         stdwin = self.stdwin
@@ -679,8 +692,11 @@ class MinesweeperApp:
         self.stdwin.stdscr.clear()
         self.stdwin.refresh()# }}}
 
-    def on_quit(self, _):
-        """Callback for viewing the quit dialog"""# {{{
+    def on_quit(self):
+        """Callback for the user quitting the program# {{{
+
+        Emits an event that may result in a confirmation dialog being
+        displayed"""
         if self.overlay.drawstate.on_draw is not None:
             return
 
@@ -693,7 +709,7 @@ class MinesweeperApp:
                 choice = 1,
                 default_height = get_grid_height(self.gameview.grid.grid_size))
 
-        self.event_handler.enqueue(OpenDialogEvent(quit_dialog))# }}}
+        self.event_handler.enqueue(QuitEvent(confirm_dialog = quit_dialog))# }}}
 
     def do_quit(self):
         """Quit the mainloop"""# {{{
@@ -701,17 +717,20 @@ class MinesweeperApp:
 
     def map_window(self): #
         """Map the application keys for controlling the window state, such as# {{{
-        screen refreshing, debug capabilities and quitting"""
+        screen refreshing, debug capabilities and quitting
+
+        By default, quitting is bound to MinesweeperApp.do_quit, which ends the
+        mainloop immediately, but this can be rebound by objects that handle
+        displaying dialogs"""
 
         self.stdwin.add_mapping(tui.askey("KEY_RESIZE"), self.on_resize)
         self.stdwin.add_mapping(tui.askey("C-L"), self.on_reset)
         self.stdwin.add_mapping(tui.askey("g"), self.debug_panel.toggle)
         self.stdwin.add_mapping(tui.askey("b"), self.on_breakpoint)
 
-        self.event_handler.bind(QuitEvent, self.on_quit)
-        on_quit = partial(self.event_handler.enqueue, QuitEvent())
-        self.stdwin.add_mapping(tui.askey("C-C"), on_quit)
-        self.stdwin.add_mapping(tui.askey("q"), on_quit) # }}}
+        self.event_handler.bind(QuitEvent, lambda _: self.do_quit())
+        self.stdwin.add_mapping(tui.askey("C-C"), self.on_quit)
+        self.stdwin.add_mapping(tui.askey("q"), self.on_quit)# }}}
 
     def map_selection(self):
         """Map the directional keys to emit movement events"""# {{{
