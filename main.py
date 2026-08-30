@@ -97,6 +97,7 @@ class Tile(Flag):
     MINE  = auto()
     FLAG  = auto()
     SEEN  = auto()
+    TRANS = auto()
 
 class TileGrid:
     """Class representing grid of tiles"""
@@ -493,8 +494,7 @@ class GameView:
             if Tile.MINE not in tile:
                 continue
 
-            new_tile = tile | Tile.SEEN
-            self.grid.set_tile(coords, new_tile)
+            self.grid.set_tile(coords, tile | Tile.TRANS)
             self.mark_tile_at(coords)# }}}
 
     def focus_cursor(self):
@@ -992,12 +992,14 @@ def get_symbol_for_coord_from(grid: TileGrid, coords: tuple[int, int]) -> str | 
     """Determine display symbol for grid coordinates"""# {{{
     tile = grid.get_tile(coords)
     symbol: str | None = None
-    if Tile.FLAG in tile:
+    if Tile.MINE in tile and Tile.SEEN in tile:
+        symbol = 'x'
+    elif Tile.MINE in tile and Tile.TRANS in tile:
+        symbol = 'x'
+    elif Tile.FLAG in tile:
         symbol = 'f'
     elif Tile.SEEN not in tile:
         symbol = None
-    elif Tile.MINE in tile:
-        symbol = 'x'
     else:
         n_neighbouring_mines = count_neighbouring_mines(grid, coords)
         symbol = ' ' if n_neighbouring_mines == 0 else str(n_neighbouring_mines)
