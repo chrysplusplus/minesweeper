@@ -110,8 +110,10 @@ class TileGrid:
         self._flags = 0# }}}
 
     def __iter__(self) -> Iterable[tuple[tuple[int, int], Tile]]:
-        for i, tile in enumerate(self._grid):# {{{
-            yield (divmod(i, self._grid_size[0]), tile) # }}}
+        width, _ = self._grid_size# {{{
+        for i, tile in enumerate(self._grid):
+            y, x = divmod(i, width)
+            yield ((x, y), tile) # }}}
 
     @property
     def grid_size(self):
@@ -489,11 +491,12 @@ class GameView:
 
     def reveal_all_mines(self):
         """Reveal all the mines in the grid"""# {{{
-        for coords, tile in self.grid:
-            if Tile.MINE not in tile:
-                continue
+        grid_changes = [(coords, tile | Tile.TRANS)
+                        for coords, tile in self.grid
+                        if Tile.MINE in tile]
 
-            self.grid.set_tile(coords, tile | Tile.TRANS)
+        for coords, tile in grid_changes:
+            self.grid.set_tile(coords, tile)
             self.mark_tile_at(coords)# }}}
 
     def focus_cursor(self):
