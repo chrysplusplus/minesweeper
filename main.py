@@ -515,7 +515,9 @@ class GameView:
 
     def update_mine_counter(self, win: curses.window):
         """Update the mine counter line"""# {{{
-        win.addstr(get_grid_height(self.grid.grid_size), 0, f'Mines left: {self.grid.mines}',
+        status_line_y = get_grid_height(self.grid.grid_size)
+        tui.win_clear_line(win, status_line_y)
+        win.addstr(status_line_y, 0, f'Mines left: {self.grid.mines}',
                    ATTR_CYAN)# }}}
 
     def refresh(self):

@@ -464,6 +464,11 @@ def win_move_cursor(win: curses.window, cursor: Cursor):
         curses.curs_set(1)
         win.move(cy, cx) # }}}
 
+def win_clear_line(win: curses.window, y: int = 0):
+    """Clear a line in the window"""# {{{
+    win.move(y, 0)
+    win.clrtoeol()# }}}
+
 def start_curses(
         stdscr: curses.window,
         init_fn: Callable[[curses.window], None],
