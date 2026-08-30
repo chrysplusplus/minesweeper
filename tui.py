@@ -293,7 +293,7 @@ class TextWindow:
     @property
     def window(self) -> curses.window:
         """window property dervied from drawstate"""
-        return self.drawstate.window
+        return self.drawstate.win
 
 def padview_clamp(pv: PadView) -> tuple[int,int,int,int,int,int]:
     """Provides clamped values for pv.refresh() or pv.noutrefresh()"""# {{{
