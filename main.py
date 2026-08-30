@@ -32,7 +32,7 @@ from util import clamp, same, label_tuple, compose2, transpose_2d
 
 class DialogLike(Protocol):
     """Protocol defining requirements of a dialog-like type"""
-    textwindow: "TextWindow"# {{{
+    textwindow: tui.TextWindow# {{{
 
     def on_draw(self, win: curses.window) -> bool:
         """Callback for drawing"""
@@ -537,16 +537,6 @@ class GameView:
         self.stdwin.remove_mapping(tui.askey(" "))
         self.stdwin.remove_mapping(tui.askey("f"))# }}}
 
-# TODO move to tui module
-@dataclass(slots = True)
-class TextWindow:
-    """Simple text window"""
-    stdwin: tui.MainWindow
-    event_handler: tui.EventHandler
-    window: curses.window
-    drawstate: tui.WindowDrawState
-    padview: tui.PadView | None = None
-
 @dataclass(slots = True)
 class Option:
     """Parameters for option entry in OptionsDialog"""
@@ -558,7 +548,7 @@ class Option:
 @dataclass(slots = True)
 class OptionsDialog:
     """Overlaying options dialog box"""
-    textwindow: TextWindow
+    textwindow: tui.TextWindow
     message: list[str]
     options: list[Option]
     _: KW_ONLY
@@ -1030,7 +1020,7 @@ def get_grid_height(grid_size: tuple[int, int]) -> int:
     _, height = grid_size
     return 2 * height + 1# }}}
 
-def key_instruction_bar(stdwin: tui.MainWindow, event_handler: tui.EventHandler) -> TextWindow:
+def key_instruction_bar(stdwin: tui.MainWindow, event_handler: tui.EventHandler) -> tui.TextWindow:
     """Object for drawing key instructions"""# {{{
     window = curses.newwin(1, curses.COLS, curses.LINES - 1, 0)
     drawstate = tui.WindowDrawState(window)
@@ -1046,10 +1036,9 @@ def key_instruction_bar(stdwin: tui.MainWindow, event_handler: tui.EventHandler)
 
     drawstate.on_draw = on_draw
     stdwin.add_child(drawstate)
-    return TextWindow(
+    return tui.TextWindow(
             stdwin,
             event_handler,
-            window,
             drawstate)# }}}
 
 def overlay(stdwin: tui.MainWindow, event_handler: tui.EventHandler):
@@ -1058,10 +1047,9 @@ def overlay(stdwin: tui.MainWindow, event_handler: tui.EventHandler):
     padview = tui.PadView(window)
     drawstate = tui.WindowDrawState(window)
     stdwin.add_child(drawstate, padview)
-    return TextWindow(
+    return tui.TextWindow(
             stdwin,
             event_handler,
-            window,
             drawstate,
             padview)# }}}
 
@@ -1079,10 +1067,9 @@ def titlebar(stdwin: tui.MainWindow, event_handler: tui.EventHandler):
 
     drawstate.on_draw = on_draw
     stdwin.add_child(drawstate)
-    return TextWindow(
+    return tui.TextWindow(
             stdwin,
             event_handler,
-            window,
             drawstate)# }}}
 
 if __name__ == "__main__":

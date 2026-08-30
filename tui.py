@@ -308,6 +308,25 @@ class MainWindow:
             if self.on_post_key is not None:
                 self.on_post_key()# }}}
 
+@dataclass(slots = True)
+class TextWindow:
+    """Simple text window
+
+    The window handle of the PadView, if provided, must match that of the
+    WindowDrawState"""
+    stdwin: MainWindow
+    event_handler: EventHandler
+    drawstate: WindowDrawState
+    padview: PadView | None = None
+
+    def __post_init__(self):
+        assert self.padview is None or id(self.padview.pad) == id(self.drawstate.win)
+
+    @property
+    def window(self) -> curses.window:
+        """window property dervied from drawstate"""
+        return self.drawstate.window
+
 def padview_clamp(pv: PadView) -> tuple[int,int,int,int,int,int]:
     """Provides clamped values for pv.refresh() or pv.noutrefresh()"""# {{{
     py, px = pv.pad_start
