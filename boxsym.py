@@ -51,4 +51,3 @@ L_EsW, L_eSw, L_ESW        = _tbl_boxsym[42], _tbl_boxsym[43], _tbl_boxsym[44]
 L_nEW, L_New, L_NEW        = _tbl_boxsym[46], _tbl_boxsym[47], _tbl_boxsym[48]
 L_nEsW, L_NeSw, L_NESW     = _tbl_boxsym[50], _tbl_boxsym[51], _tbl_boxsym[52]
 C_es, C_sw, C_nw, C_ne     = _tbl_boxsym[54], _tbl_boxsym[55], _tbl_boxsym[56], _tbl_boxsym[57]
-

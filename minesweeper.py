@@ -26,8 +26,14 @@ from random import shuffle
 from typing import Any, Protocol
 
 import tui
-from boxsym import *
 from util import clamp, same, label_tuple, compose2, transpose_2d
+
+from boxsym import (
+        L_ew, L_ns,
+        L_es, L_sw, L_ne, L_nw,
+        L_nes, L_nsw, L_esw, L_new,
+        L_nesw,
+        C_es, C_sw, C_nw, C_ne)
 
 class DialogLike(Protocol):
     """Protocol defining requirements of a dialog-like type"""
@@ -263,7 +269,6 @@ class GameState(Enum):
 
 # TODO check these notes
 # NOTE pylint gives R0904: Too many public methods
-# NOTE pylint gives R0902: Too many instance attributes
 class GameView:
     """Class for drawing the Minesweeper grid and handling game logic"""
     __slots__ = ("textwindow", "selection", "state", "grid", "last_quit_callback")
@@ -393,9 +398,8 @@ class GameView:
         self.textwindow.stdwin.refresh()
         self.focus_cursor()# }}}
 
-    # TODO change to GameView.start_playing()
-    def bind_events(self):
-        """Bind game events"""# {{{
+    def starting_playing(self):
+        """Bind events to start playing the minesweeper game"""# {{{
         self.bind_movement_events()
         self.bind_game_events()
         self.bind_dialog_events()
@@ -480,7 +484,7 @@ class GameView:
 
         neighbour_coords = list(iter_3x3_area_coords(self.grid.grid_size, coords))
         neighbour_tiles = (self.grid.get_tile(neighbour) for neighbour in neighbour_coords)
-        if (n_neighbouring_mines := sum(Tile.MINE in t for t in neighbour_tiles)) == 0:
+        if sum(Tile.MINE in t for t in neighbour_tiles) == 0:
             for neighbour in neighbour_coords:
                 self.reveal_tile_at(neighbour)
 
@@ -658,7 +662,7 @@ class MinesweeperApp:
 
         self.map_window()
         self.map_selection()
-        self.gameview.bind_events()
+        self.gameview.starting_playing()
         self.gameview.map_game_controls()
         self.stdwin.mainloop() # }}}
 
@@ -671,19 +675,6 @@ class MinesweeperApp:
 
     def on_reset(self):
         """Callback for window reset/refresh"""# {{{
-        self.stdwin.stdscr.clear()
-        self.stdwin.refresh()# }}}
-
-    # NOTE causes issue with resizing after breakpoint is triggered
-    # likely due to switching modes without them being correctly set up
-    def on_breakpoint(self):
-        """Callback for debug breakpoint"""# {{{
-        self.stdwin.stdscr.move(0, 0)
-        self.stdwin.stdscr.clrtobot()
-        self.stdwin.stdscr.refresh()
-        curses.reset_shell_mode()
-        breakpoint()
-        curses.reset_prog_mode()
         self.stdwin.stdscr.clear()
         self.stdwin.refresh()# }}}
 
@@ -721,7 +712,6 @@ class MinesweeperApp:
         self.stdwin.add_mapping(tui.askey("KEY_RESIZE"), self.on_resize)
         self.stdwin.add_mapping(tui.askey("C-L"), self.on_reset)
         self.stdwin.add_mapping(tui.askey("g"), self.debug_panel.toggle)
-        self.stdwin.add_mapping(tui.askey("b"), self.on_breakpoint)
 
         self.event_handler.bind(QuitEvent, lambda _: self.do_quit())
         self.stdwin.add_mapping(tui.askey("C-C"), self.on_quit)
@@ -865,6 +855,7 @@ def is_barrier(ch: str) -> bool:
     """Return True if character is considered a barrier symbol"""# {{{
     return ch != " "# }}}
 
+# TODO try rewriting
 def join_barriers(north: str, east: str, south: str, west: str) -> str:
     """Return symbol joining barriers in four directions"""# {{{
     n = is_barrier(north)
