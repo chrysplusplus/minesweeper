@@ -26,8 +26,7 @@ from random import shuffle
 from typing import Any, Protocol
 
 import tui
-from tui import L_ew, L_ns, L_es, L_sw, L_ne, L_nw, L_nes, L_nsw, L_esw, L_new, L_nesw, C_es,\
-        C_sw, C_nw, C_ne
+from boxsym import *
 from util import clamp, same, label_tuple, compose2, transpose_2d
 
 class DialogLike(Protocol):

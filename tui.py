@@ -74,38 +74,6 @@ from util import clamp
 
 T = TypeVar('T')
 
-linechars = [#      1    2    3    4    5{{{
-             "00", "─", "│",
-             "03", "┌", "┐", "└", "┘",
-             "08", "├", "┤", "┬", "┴", "┼",
-             "14", "═", "║",
-             "17", "╒", "╓", "╔",
-             "21", "╕", "╖", "╗",
-             "25", "╘", "╙", "╚",
-             "29", "╛", "╜", "╝",
-             "33", "╞", "╟", "╠",
-             "37", "╡", "╢", "╣",
-             "41", "╤", "╥", "╦",
-             "45", "╧", "╨", "╩",
-             "49", "╪", "╫", "╬",
-             "53", "╭", "╮", "╯", "╰" ]# }}}
-
-L_ew, L_ns                         = linechars[1],  linechars[2]
-L_es, L_sw, L_ne, L_nw             = linechars[4],  linechars[5],  linechars[6],  linechars[7]
-L_nes, L_nsw, L_esw, L_new, L_nesw = linechars[9],  linechars[10], linechars[11], linechars[12],\
-        linechars[13]
-L_EW, L_NS                         = linechars[15], linechars[16]
-L_Es, L_eS, L_ES                   = linechars[18], linechars[19], linechars[20]
-L_sW, L_Sw, L_SW                   = linechars[22], linechars[23], linechars[24]
-L_nE, L_Ne, L_NE                   = linechars[26], linechars[27], linechars[28]
-L_nW, L_Nw, L_NW                   = linechars[30], linechars[31], linechars[32]
-L_nEs, L_NeS, L_NES                = linechars[34], linechars[35], linechars[36]
-L_nsW, L_NSw, L_NSW                = linechars[38], linechars[39], linechars[40]
-L_EsW, L_eSw, L_ESW                = linechars[42], linechars[43], linechars[44]
-L_nEW, L_New, L_NEW                = linechars[46], linechars[47], linechars[48]
-L_nEsW, L_NeSw, L_NESW             = linechars[50], linechars[51], linechars[52]
-C_es, C_sw, C_nw, C_ne             = linechars[54], linechars[55], linechars[56], linechars[57]
-
 @dataclass(slots = True, frozen = True)
 class Key:
     """Class representing user input keys"""
