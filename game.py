@@ -135,23 +135,31 @@ class GameState(Enum):
     WIN = auto()
     LOSE = auto()
 
+@dataclass(slots = True)
+class GameViewParameters:
+    """Class detailing input parameters for a initialising GameView object"""
+    _: KW_ONLY
+    stdwin: tui.MainWindow
+    event_handler: EventHandler
+    grid: TileGrid
+
 # TODO check these notes
 # NOTE pylint gives R0904: Too many public methods
 class GameView:
     """Class for drawing the Minesweeper grid and handling game logic"""
     __slots__ = ("textwindow", "selection", "state", "grid", "last_quit_callback")
 
-    def __init__(self, stdwin: tui.MainWindow, event_handler: EventHandler, grid: TileGrid):
+    def __init__(self, params: GameViewParameters):
         window = curses.newpad(100, 100)# {{{
         padview = tui.PadView(window, desired_screen_start = (2, 0))
         drawstate = tui.WindowDrawState(window)
         drawstate.on_draw = self.on_game_draw
-        stdwin.add_child(drawstate, padview)
+        params.stdwin.add_child(drawstate, padview)
 
-        self.textwindow = tui.TextWindow(stdwin, event_handler, drawstate, padview)
+        self.textwindow = tui.TextWindow(params.stdwin, params.event_handler, drawstate, padview)
         self.selection = (0, 0)
         self.state = GameState.INITIALISING
-        self.grid = grid
+        self.grid = params.grid
         # TODO dialog handling class
         self.last_quit_callback: Callable[[BaseEvent], None] | None = None# }}}
 
@@ -410,6 +418,13 @@ class GameView:
         """Remove mappings for game controls"""# {{{
         self.textwindow.stdwin.remove_mapping(tui.askey(" "))
         self.textwindow.stdwin.remove_mapping(tui.askey("f"))# }}}
+
+def make_game_view(**kwargs) -> GameView:
+    """Helper function for initialising GameView
+
+    See GameViewParameters for parameter names and corresponding types. Returns
+    a GameView"""
+    return GameView(GameViewParameters(**kwargs))
 
 def empty_tile_grid(grid_size: tuple[int, int], mines: int) -> TileGrid:
     """Create an empty grid"""# {{{

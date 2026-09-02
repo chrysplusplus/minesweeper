@@ -27,7 +27,7 @@ import terminal as term
 from dialog import MovementEvent, SelectEvent, Option, OptionsDialog
 from event import EventHandler
 from game import QuitEvent, GameView, empty_tile_grid, label_yxcoords, label_xycoords, \
-        get_grid_height
+        get_grid_height, make_game_view
 from terminal import init_curses
 from util import same, compose2
 
@@ -122,7 +122,10 @@ class MinesweeperApp:
         self.event_handler = EventHandler()
         self.stdwin.on_post_key = self.event_handler.process
 
-        self.gameview = GameView(self.stdwin, self.event_handler, empty_tile_grid((10, 10), 15))
+        self.gameview = make_game_view(
+                stdwin = self.stdwin,
+                event_handler = self.event_handler,
+                grid = empty_tile_grid((10, 10), 15))
         self.keyhelp = key_instruction_bar(self.stdwin, self.event_handler)
         self.overlay = overlay(self.stdwin, self.event_handler)
         self.titlebar = titlebar(self.stdwin, self.event_handler)
