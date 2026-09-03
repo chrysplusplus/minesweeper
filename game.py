@@ -7,16 +7,18 @@ Module for handling game and game display logic"""
 import curses
 
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass, KW_ONLY
+from dataclasses import dataclass, KW_ONLY, field
 from enum import Flag, auto, Enum
 from functools import partial
 from itertools import repeat, pairwise
 from random import shuffle
+from typing import Any
 
 import tui
 import terminal as term
 
-from dialog import DialogLike, MovementEvent, SelectEvent, OpenDialogEvent, DialogRestoreEvent
+from dialog import DialogLike, MovementEvent, SelectEvent, QuitEvent, OpenDialogEvent,\
+        DialogRestoreEvent
 from event import BaseEvent, EventHandler
 from util import clamp, label_tuple, transpose_2d
 
@@ -29,12 +31,6 @@ from boxsym import (
 
 class PlaceFlagEvent(BaseEvent):
     """Event class for placing flags at the current selection"""
-
-@dataclass(slots = True)
-class QuitEvent(BaseEvent):
-    """Event class for the user quitting the program"""
-    _: KW_ONLY
-    confirm_dialog: DialogLike | None = None
 
 @dataclass(slots = True)
 class GameLoseEvent(BaseEvent):
@@ -136,30 +132,41 @@ class GameState(Enum):
     LOSE = auto()
 
 @dataclass(slots = True)
-class GameViewParameters:
-    """Class detailing input parameters for a initialising GameView object"""
+class GameContext:
+    """Contains resources for handling game execution context"""
     _: KW_ONLY
-    stdwin: tui.MainWindow
-    event_handler: EventHandler
-    grid: TileGrid
+    overlay_window: curses.window | None = None
+    grid: TileGrid | None = None
+    game_data: dict[str, Any] = field(default_factory = dict)
 
 # TODO check these notes
 # NOTE pylint gives R0904: Too many public methods
 class GameView:
     """Class for drawing the Minesweeper grid and handling game logic"""
-    __slots__ = ("textwindow", "selection", "state", "grid", "last_quit_callback")
+    __slots__ = ("textwindow", "selection", "state", "grid", "context", "last_quit_callback")
 
-    def __init__(self, params: GameViewParameters):
+    def __init__(self,
+                 stdwin: tui.MainWindow,
+                 event_handler: EventHandler,
+                 *,
+                 grid: TileGrid | None = None, # TODO move into GameContext
+                 context: GameContext | None = None):
         window = curses.newpad(100, 100)# {{{
         padview = tui.PadView(window, desired_screen_start = (2, 0))
         drawstate = tui.WindowDrawState(window)
         drawstate.on_draw = self.on_game_draw
-        params.stdwin.add_child(drawstate, padview)
+        stdwin.add_child(drawstate, padview)
 
-        self.textwindow = tui.TextWindow(params.stdwin, params.event_handler, drawstate, padview)
+        self.textwindow = tui.TextWindow(stdwin, event_handler, drawstate, padview)
+
+        # TODO move into GameContext
         self.selection = (0, 0)
         self.state = GameState.INITIALISING
-        self.grid = params.grid
+        assert grid is not None
+        self.grid = grid
+
+        self.context = context if context is not None else GameContext()
+
         # TODO dialog handling class
         self.last_quit_callback: Callable[[BaseEvent], None] | None = None# }}}
 
@@ -418,13 +425,6 @@ class GameView:
         """Remove mappings for game controls"""# {{{
         self.textwindow.stdwin.remove_mapping(tui.askey(" "))
         self.textwindow.stdwin.remove_mapping(tui.askey("f"))# }}}
-
-def make_game_view(**kwargs) -> GameView:
-    """Helper function for initialising GameView
-
-    See GameViewParameters for parameter names and corresponding types. Returns
-    a GameView"""
-    return GameView(GameViewParameters(**kwargs))
 
 def empty_tile_grid(grid_size: tuple[int, int], mines: int) -> TileGrid:
     """Create an empty grid"""# {{{

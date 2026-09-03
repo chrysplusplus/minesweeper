@@ -46,6 +46,12 @@ class SelectEvent(BaseEvent):
     """Event class for activating the current selection"""
 
 @dataclass(slots = True)
+class QuitEvent(BaseEvent):
+    """Event class for the user quitting the program"""
+    _: KW_ONLY
+    confirm_dialog: DialogLike | None = None
+
+@dataclass(slots = True)
 class OpenDialogEvent(BaseEvent):
     """Event class for opening a dialog"""
     dialog: DialogLike
