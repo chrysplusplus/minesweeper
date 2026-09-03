@@ -604,12 +604,13 @@ def get_symbol_for_coord_from(grid: TileGrid, coords: tuple[int, int]) -> str | 
     """Determine display symbol for grid coordinates"""# {{{
     tile = grid.get_tile(coords)
     symbol: str | None = None
+    # TODO add setting to change these to ASCII symbols
     if Tile.MINE in tile and Tile.SEEN in tile:
-        symbol = 'x'
+        symbol = '💣'
     elif Tile.MINE in tile and Tile.TRANS in tile:
-        symbol = 'x'
+        symbol = '💣'
     elif Tile.FLAG in tile:
-        symbol = 'f'
+        symbol = '🚩'
     elif Tile.SEEN not in tile:
         symbol = None
     else:
