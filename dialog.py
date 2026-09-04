@@ -127,7 +127,7 @@ class OptionsDialog:
 
         sy = (area_height - y) // 2
         sx = (area_width - width) // 2
-        pv.desired_view_size = (y, width)
+        pv.desired_view_size = (y, width - 1)
         pv.desired_screen_start = (sy, sx)
 
         self.reposition_cursor()
