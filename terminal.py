@@ -22,6 +22,7 @@ def init_curses(_):
     """Initialise the curses library"""
     curses.raw()
     curses.use_default_colors()
+    curses.halfdelay(2)
 
     # init colors
     assert curses.COLOR_PAIRS > 8

@@ -271,7 +271,7 @@ class GridDisplay:
 
 class GameLogic:
     """Handles game controls and logic"""
-    __slots__ = ("stdwin", "event_handler", "overlay", "display", "state", "grid")
+    __slots__ = ("stdwin", "event_handler", "overlay", "display", "state", "grid", "end_counter")
 
     def __init__(self,
                  stdwin: tui.MainWindow,
@@ -283,6 +283,7 @@ class GameLogic:
         self.display = GridDisplay(stdwin, grid)
         self.grid = grid
         self.state = GameState.INITIALISING
+        self.end_counter = 0
 
     def on_grid_selection_changed(self, e: MovementEvent):
         """Callback for updating grid selection"""
@@ -299,6 +300,15 @@ class GameLogic:
         self.reveal_tile_at(self.display.selection)
         self.display.redraw()
         self.display.focus_cursor()
+
+    def on_idle(self):
+        """Callback for user idling"""
+        if self.state in (GameState.WIN, GameState.LOSE) and self.end_counter >= 0:
+            self.end_counter += 1
+
+        if self.end_counter >= 10:
+            self.end_counter = -1
+            self.event_handler.enqueue(NewGameEvent())
 
     def on_lose(self, e: GameLoseEvent):
         """Callback for losing the game"""
@@ -384,6 +394,7 @@ class GameLogic:
 
         new_grid = empty_tile_grid(self.grid.grid_size, self.grid.get_total_mines())
         self.grid = new_grid
+        self.end_counter = 0
         self.display.set_grid(new_grid)
 
         if self.state in (GameState.WIN, GameState.LOSE):
@@ -407,10 +418,12 @@ class GameLogic:
     def bind_movement_events(self):
         """Bind movement events"""
         self.event_handler.bind(MovementEvent, self.on_grid_selection_changed)
+        self.stdwin.add_mapping(tui.IDLE_KEY, self.on_idle)
 
     def unbind_movement_events(self):
         """Unbind movement events"""
         self.event_handler.unbind(MovementEvent)
+        self.stdwin.remove_mapping(tui.IDLE_KEY)
 
     def bind_game_events(self):
         """Bind game events"""
