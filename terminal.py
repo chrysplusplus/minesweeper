@@ -6,8 +6,9 @@ Curses and color terminal support"""
 
 import curses
 
-ATTR_NORMAL = curses.A_NORMAL
-ATTR_UNDER  = curses.A_UNDERLINE
+ATTR_NORMAL  = curses.A_NORMAL
+ATTR_UNDER   = curses.A_UNDERLINE
+ATTR_REVERSE = curses.A_REVERSE
 
 ATTR_BLUE:      int # initialised by init_curses
 ATTR_CYAN:      int # initialised by init_curses
