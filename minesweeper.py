@@ -47,7 +47,7 @@ class DebugPanel:
 
         self.is_visible = False
         self.update_callback: Callable[[], None] | None = None
-        self.track_map = {} 
+        self.track_map = {}
 
     def on_draw(self, win: curses.window) -> bool:
         """Callback for drawing the window"""
@@ -142,7 +142,7 @@ class MinesweeperApp:
         self.map_selection()
         self.game_logic.map_game_controls()
         self.game_logic.start_playing()
-        self.stdwin.mainloop() 
+        self.stdwin.mainloop()
 
     def on_resize(self):
         """Callback for window resizing"""
@@ -239,7 +239,7 @@ class MinesweeperApp:
         self.debug_panel.track("pv_screen", compose2(
             partial(getattr, gameview_pv, "desired_screen_start"), label_yxcoords))
         self.debug_panel.track("pv_view", compose2(
-            partial(getattr, gameview_pv, "desired_view_size"), label_yxcoords)) 
+            partial(getattr, gameview_pv, "desired_view_size"), label_yxcoords))
 
 def key_instruction_bar(stdwin: tui.MainWindow, event_handler: EventHandler) -> tui.TextWindow:
     """Object for drawing key instructions"""
@@ -295,3 +295,5 @@ def titlebar(stdwin: tui.MainWindow, event_handler: EventHandler):
 
 if __name__ == "__main__":
     curses.wrapper(tui.start_curses, init_curses, MinesweeperApp)
+
+# vim: foldmethod=indent foldnestmax=2 foldlevel=2

@@ -697,3 +697,5 @@ def get_grid_height(grid_size: tuple[int, int]) -> int:
     """Calculate height of grid in window from its grid size"""
     _, height = grid_size
     return 2 * height + 1
+
+# vim: foldmethod=indent foldnestmax=2 foldlevel=2

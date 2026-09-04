@@ -18,7 +18,7 @@ ATTR_WHITE:     int # initialised by init_curses
 ATTR_YELLOW:    int # initialised by init_curses
 
 def init_curses(_):
-    """Initialise the curses library"""# {{{
+    """Initialise the curses library"""
     curses.raw()
     curses.use_default_colors()
 
@@ -39,6 +39,6 @@ def init_curses(_):
     ATTR_MAGENTA  = curses.color_pair(4)
     ATTR_RED      = curses.color_pair(5)
     ATTR_WHITE    = curses.color_pair(6)
-    ATTR_YELLOW   = curses.color_pair(7) # }}}
+    ATTR_YELLOW   = curses.color_pair(7)
 
-# vim: foldmethod=marker
+# vim: foldmethod=indent foldnestmax=2 foldlevel=2

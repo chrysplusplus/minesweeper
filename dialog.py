@@ -35,11 +35,11 @@ class MovementEvent(BaseEvent):
     relative: bool = True
 
     def get_moved_coords_from(self, from_coords: tuple[int, int]) -> tuple[int, int]:
-        """Return the new coords after movement from initial coords"""# {{{
+        """Return the new coords after movement from initial coords"""
         fromx, fromy = from_coords
         if self.relative:
             return (fromx + self.x, fromy + self.y)
-        return (self.x, self.y) # }}}
+        return (self.x, self.y)
 
 @dataclass(slots = True)
 class SelectEvent(BaseEvent):
@@ -82,7 +82,7 @@ class OptionsDialog:
     on_restore: Callable[[], None] | None = None
 
     def on_draw(self, win: curses.window) -> bool:
-        """Callback for drawing window"""# {{{
+        """Callback for drawing window"""
         pv = self.textwindow.padview
         assert pv is not None
         win.erase()
@@ -118,42 +118,42 @@ class OptionsDialog:
         pv.desired_screen_start = (sy, sx)
 
         self.reposition_cursor()
-        return True# }}}
+        return True
 
     def on_selection_changed(self, e: MovementEvent):
-        """Callback to changing the selection"""# {{{
+        """Callback to changing the selection"""
         delta = e.x if e.x != 0 else e.y
         self.choice = (self.choice + delta) % len(self.options)
-        self.reposition_cursor()# }}}
+        self.reposition_cursor()
 
     def on_select(self, _):
-        """Callback for selecting an option"""# {{{
+        """Callback for selecting an option"""
         assert self.choice < len(self.options)
         selection = self.options[self.choice]
         if selection.callback is not None:
             selection.callback()
 
         if selection.do_restore:
-            self.textwindow.event_handler.enqueue(DialogRestoreEvent(self))# }}}
+            self.textwindow.event_handler.enqueue(DialogRestoreEvent(self))
 
     def reposition_cursor(self):
-        """Reposition the screen cursor to the selection"""# {{{
+        """Reposition the screen cursor to the selection"""
         stdwin = self.textwindow.stdwin
         sy, sx = self.textwindow.padview.desired_screen_start
         cy = len(self.message) + self.choice + sy + 1
         stdwin.stdcurs.cursor = (cy, sx)
-        stdwin.move_cursor(stdwin.stdcurs)# }}}
+        stdwin.move_cursor(stdwin.stdcurs)
 
     def bind_events(self):
-        """Bind events for option dialog"""# {{{
+        """Bind events for option dialog"""
         event_handler = self.textwindow.event_handler
         event_handler.bind(MovementEvent, self.on_selection_changed)
-        event_handler.bind(SelectEvent, self.on_select)# }}}
+        event_handler.bind(SelectEvent, self.on_select)
 
     def unbind_events(self):
-        """Unbind events after use"""# {{{
+        """Unbind events after use"""
         event_handler = self.textwindow.event_handler
         event_handler.unbind(MovementEvent)
-        event_handler.unbind(SelectEvent)# }}}
+        event_handler.unbind(SelectEvent)
 
-# vim: foldmethod=marker
+# vim: foldmethod=indent foldnestmax=2 foldlevel=2

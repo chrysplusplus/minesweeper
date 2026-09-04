@@ -64,7 +64,7 @@ class Connector(Flag):
     WEST  = 8
 
     def __str__(self) -> str:
-        """Convert to box symbol character string"""# {{{
+        """Convert to box symbol character string"""
         SYMBOLS_BY_CONNECTOR = {
                 (self.NORTH | self.EAST):  L_ne,
                 (self.NORTH | self.SOUTH): L_ns,
@@ -81,10 +81,10 @@ class Connector(Flag):
                 (self.NORTH | self.EAST | self.SOUTH | self.WEST): L_nesw}
 
         symbol = SYMBOLS_BY_CONNECTOR.get(self)
-        return symbol if symbol is not None else ' '# }}}
+        return symbol if symbol is not None else ' '
 
 def make_connector(*, north: bool, east: bool, south: bool, west: bool) -> Connector:
-    """Make a connector object from connection conditions"""# {{{
+    """Make a connector object from connection conditions"""
     result = Connector.NONE
     if north:
         result |= Connector.NORTH
@@ -94,6 +94,6 @@ def make_connector(*, north: bool, east: bool, south: bool, west: bool) -> Conne
         result |= Connector.SOUTH
     if west:
         result |= Connector.WEST
-    return result# }}}
+    return result
 
-# vim: foldmethod=marker
+# vim: foldmethod=indent foldnestmax=2 foldlevel=2
