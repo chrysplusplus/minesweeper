@@ -22,10 +22,10 @@ from util import clamp, label_tuple, transpose_2d
 
 from boxsym import (
         L_ew, L_ns,
-        L_es, L_sw, L_ne, L_nw,
         L_nes, L_nsw, L_esw, L_new,
         L_nesw,
-        C_es, C_sw, C_nw, C_ne)
+        C_es, C_sw, C_nw, C_ne,
+        make_connector)
 
 class PlaceFlagEvent(BaseEvent):
     """Event class for placing flags at the current selection"""
@@ -490,37 +490,15 @@ def is_barrier(ch: str) -> bool:
     """Return True if character is considered a barrier symbol"""# {{{
     return ch != " "# }}}
 
-# TODO try rewriting
 def join_barriers(north: str, east: str, south: str, west: str) -> str:
     """Return symbol joining barriers in four directions"""# {{{
-    n = is_barrier(north)
-    e = is_barrier(east)
-    s = is_barrier(south)
-    w = is_barrier(west)
-    result = " "
-    if n and e and s and w:
-        result = L_nesw
-    elif n and e and w:
-        result = L_new
-    elif e and s and w:
-        result = L_esw
-    elif n and s and w:
-        result = L_nsw
-    elif n and e and s:
-        result = L_nes
-    elif n and w:
-        result = L_nw
-    elif n and e:
-        result = L_ne
-    elif s and w:
-        result = L_sw
-    elif e and s:
-        result = L_es
-    elif n and s:
-        result = L_ns
-    elif e and w:
-        result = L_ew
-    return result# }}}
+    connector = make_connector(
+            north = is_barrier(north),
+            east = is_barrier(east),
+            south = is_barrier(south),
+            west = is_barrier(west))
+
+    return str(connector)# }}}
 
 def format_grid_top_border(elems: Iterable[str]) -> str:
     """Format top gridline border from row elements"""# {{{

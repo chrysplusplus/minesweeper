@@ -4,6 +4,8 @@ Date: 2026-08-30
 
 Collection of box symbols"""
 
+from enum import Flag
+
 __all__= ("L_ew", "L_ns",
           "L_es", "L_sw", "L_ne", "L_nw",
           "L_nes", "L_nsw", "L_esw", "L_new",
@@ -18,7 +20,8 @@ __all__= ("L_ew", "L_ns",
           "L_EsW", "L_eSw", "L_ESW",
           "L_nEW", "L_New", "L_NEW",
           "L_nEsW", "L_NeSw", "L_NESW",
-          "C_es", "C_sw", "C_nw", "C_ne")
+          "C_es", "C_sw", "C_nw", "C_ne"
+          "Connector", "make_connector")
 
 _tbl_boxsym = [#      1    2    3    4    5
                "00", "─", "│",
@@ -51,3 +54,46 @@ L_EsW, L_eSw, L_ESW        = _tbl_boxsym[42], _tbl_boxsym[43], _tbl_boxsym[44]
 L_nEW, L_New, L_NEW        = _tbl_boxsym[46], _tbl_boxsym[47], _tbl_boxsym[48]
 L_nEsW, L_NeSw, L_NESW     = _tbl_boxsym[50], _tbl_boxsym[51], _tbl_boxsym[52]
 C_es, C_sw, C_nw, C_ne     = _tbl_boxsym[54], _tbl_boxsym[55], _tbl_boxsym[56], _tbl_boxsym[57]
+
+class Connector(Flag):
+    """Represents an object connecting to points in four cardinal directions"""
+    NONE  = 0
+    NORTH = 1
+    EAST  = 2
+    SOUTH = 4
+    WEST  = 8
+
+    def __str__(self) -> str:
+        """Convert to box symbol character string"""# {{{
+        SYMBOLS_BY_CONNECTOR = {
+                (self.NORTH | self.EAST):  L_ne,
+                (self.NORTH | self.SOUTH): L_ns,
+                (self.NORTH | self.WEST):  L_nw,
+                (self.EAST  | self.SOUTH): L_es,
+                (self.EAST  | self.WEST):  L_ew,
+                (self.SOUTH | self.WEST):  L_sw,
+
+                (self.NORTH | self.EAST  | self.SOUTH): L_nes,
+                (self.NORTH | self.EAST  | self.WEST): L_new,
+                (self.NORTH | self.SOUTH | self.WEST): L_nsw,
+                (self.EAST  | self.SOUTH | self.WEST): L_esw,
+
+                (self.NORTH | self.EAST | self.SOUTH | self.WEST): L_nesw}
+
+        symbol = SYMBOLS_BY_CONNECTOR.get(self)
+        return symbol if symbol is not None else ' '# }}}
+
+def make_connector(*, north: bool, east: bool, south: bool, west: bool) -> Connector:
+    """Make a connector object from connection conditions"""# {{{
+    result = Connector.NONE
+    if north:
+        result |= Connector.NORTH
+    if east:
+        result |= Connector.EAST
+    if south:
+        result |= Connector.SOUTH
+    if west:
+        result |= Connector.WEST
+    return result# }}}
+
+# vim: foldmethod=marker
