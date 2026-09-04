@@ -131,26 +131,15 @@ class GameState(Enum):
     WIN = auto()
     LOSE = auto()
 
-@dataclass(slots = True)
-class GameContext:
-    """Contains resources for handling game execution context"""
-    _: KW_ONLY
-    overlay_window: curses.window | None = None
-    grid: TileGrid | None = None
-    game_data: dict[str, Any] = field(default_factory = dict)
-
-# TODO check these notes
-# NOTE pylint gives R0904: Too many public methods
 class GameView:
     """Class for drawing the Minesweeper grid and handling game logic"""
-    __slots__ = ("textwindow", "selection", "state", "grid", "context", "last_quit_callback")
+    __slots__ = ("textwindow", "selection", "state", "grid", "last_quit_callback")
 
     def __init__(self,
                  stdwin: tui.MainWindow,
                  event_handler: EventHandler,
                  *,
-                 grid: TileGrid | None = None, # TODO move into GameContext
-                 context: GameContext | None = None):
+                 grid: TileGrid | None = None):
         window = curses.newpad(100, 100)# {{{
         padview = tui.PadView(window, desired_screen_start = (2, 0))
         drawstate = tui.WindowDrawState(window)
@@ -159,13 +148,10 @@ class GameView:
 
         self.textwindow = tui.TextWindow(stdwin, event_handler, drawstate, padview)
 
-        # TODO move into GameContext
         self.selection = (0, 0)
         self.state = GameState.INITIALISING
         assert grid is not None
         self.grid = grid
-
-        self.context = context if context is not None else GameContext()
 
         # TODO dialog handling class
         self.last_quit_callback: Callable[[BaseEvent], None] | None = None# }}}
@@ -211,6 +197,7 @@ class GameView:
 
     def on_flag(self, _):
         """Callback for toggling flag at the current grid selection"""# {{{
+        # TODO fix visual bug when deleting unicode flag symbol
         if self.grid.empty():
             return
 
