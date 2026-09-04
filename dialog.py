@@ -12,6 +12,8 @@ from typing import Protocol
 
 import tui
 from event import BaseEvent
+from boxsym import L_ew, L_ns, C_es, C_sw, C_nw, C_ne
+from util import left_pad_text_to_width
 
 class DialogLike(Protocol):
     """Protocol defining requirements of a dialog-like type"""
@@ -81,31 +83,42 @@ class OptionsDialog:
     default_height: int | None = None
     on_restore: Callable[[], None] | None = None
 
+    @property
+    def padview(self) -> tui.PadView:
+        """Return PadView from TextWindow"""
+        assert self.textwindow.padview is not None
+        return self.textwindow.padview
+
     def on_draw(self, win: curses.window) -> bool:
         """Callback for drawing window"""
-        pv = self.textwindow.padview
-        assert pv is not None
+        pv = self.padview
         win.erase()
         _, maxx = win.getmaxyx()
 
+        lines = self.get_content()
+        width = min(max(len(line) for line in lines) + 2, maxx)
+        inner_width = width - 2
+
+        format_string = "{left}{inner}{right}"
+
         y = 0
-        width = 0
-
-        for line in self.message:
-            trimmed = line[:maxx]
-            width = max(width, len(trimmed))
-            win.addstr(y, 0, trimmed)
-            y += 1
-
+        win.addstr(y, 0, format_string.format(
+            left = C_es,
+            inner = L_ew * inner_width,
+            right = C_sw))
         y += 1
 
-        for option in self.options:
-            line = option.text[:maxx]
-            width = max(width, len(line))
-            win.addstr(y, 0, line)
+        for line in lines:
+            win.addstr(y, 0, format_string.format(
+                left = L_ns,
+                inner = left_pad_text_to_width(line[:inner_width], inner_width),
+                right = L_ns))
             y += 1
 
-        y -= 1
+        win.addstr(y, 0, format_string.format(
+            left = C_ne,
+            inner = L_ew * inner_width,
+            right = C_nw))
 
         area_height = self.default_height if self.default_height is not None else curses.LINES
         area_height = min(area_height, curses.LINES)
@@ -136,12 +149,19 @@ class OptionsDialog:
         if selection.do_restore:
             self.textwindow.event_handler.enqueue(DialogRestoreEvent(self))
 
+    def get_content(self) -> list[str]:
+        """Get text content for the dialog box"""
+        lines = [line for line in self.message]
+        lines.append("")
+        lines += [option.text for option in self.options]
+        return lines
+
     def reposition_cursor(self):
         """Reposition the screen cursor to the selection"""
         stdwin = self.textwindow.stdwin
-        sy, sx = self.textwindow.padview.desired_screen_start
-        cy = len(self.message) + self.choice + sy + 1
-        stdwin.stdcurs.cursor = (cy, sx)
+        sy, sx = self.padview.desired_screen_start
+        cy = len(self.message) + self.choice + sy + 2
+        stdwin.stdcurs.cursor = (cy, sx + 1)
         stdwin.move_cursor(stdwin.stdcurs)
 
     def bind_events(self):

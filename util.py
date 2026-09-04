@@ -49,6 +49,12 @@ def pad_text(text: str, padding: int) -> str:
     pad = " "* padding
     return pad + text + pad
 
+def left_pad_text_to_width(text: str, width: str) -> str:
+    """Left pad a string with trailing spaces to specified width"""
+    pad_width = width - len(text)
+    pad = " " * pad_width
+    return text + pad
+
 def same(this: Any, that: Any) -> bool:
     """Shorthand for ensure two variables refer to the same object"""
     return id(this) == id(that)
