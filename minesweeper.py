@@ -250,8 +250,8 @@ def key_instruction_bar(stdwin: tui.MainWindow, event_handler: EventHandler) -> 
         win.mvwin(curses.LINES - 1, 0)
         _, maxx = win.getmaxyx()
         win.erase()
-        text = "KEYS: ←↑↓→/wasd to move; f to place flag; Space/Return to check; "\
-                "n for new game; q/^C to quit"[:maxx - 1]
+        text = " KEYS: ←↑↓→/wasd to move; f to place flag; Space/Return to check; "\
+                "n for new game; q/^C to quit "[:maxx - 1]
         win.addstr(0, 0, text, term.ATTR_REVERSE)
         return True
 

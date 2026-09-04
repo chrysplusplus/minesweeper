@@ -245,9 +245,16 @@ class GridDisplay:
 
     def update_mine_counter(self, win: curses.window):
         """Update the mine counter line"""
+        if self.grid.mines == 0:
+            text = "All mines found!"
+            attr = term.ATTR_YELLOW
+        else:
+            text = f"Mines left: {self.grid.mines}"
+            attr = term.ATTR_CYAN
+
         status_line_y = get_grid_height(self.grid.grid_size)
         tui.win_clear_line(win, status_line_y)
-        win.addstr(status_line_y, 0, f'Mines left: {self.grid.mines}', term.ATTR_CYAN)
+        win.addstr(status_line_y, 0, text, attr)
 
     def resize(self):
         """Resize the drawing surface to fill the available space"""
@@ -381,7 +388,8 @@ class GameLogic:
                 message = ["Start a new game?"],
                 options = [
                     Option("Yes", self.do_new_game, do_restore = True),
-                    Option("No", do_restore = True)],
+                    Option("No", do_restore = True),
+                    Option("Quit", lambda: self.stdwin.quit(), do_restore = True)],
                 choice = 1,
                 default_height = get_grid_height(self.grid.grid_size))
 
