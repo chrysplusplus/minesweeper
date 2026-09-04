@@ -38,7 +38,7 @@ class DebugPanel:
                  "track_map")
 
     def __init__(self, stdwin: tui.MainWindow):
-        self.stdwin = stdwin# {{{
+        self.stdwin = stdwin
         self.window = curses.newpad(100, 100)
         self.padview = tui.PadView(self.window)
         self.drawstate = tui.WindowDrawState(self.window)
@@ -47,10 +47,10 @@ class DebugPanel:
 
         self.is_visible = False
         self.update_callback: Callable[[], None] | None = None
-        self.track_map = {} # }}}
+        self.track_map = {} 
 
     def on_draw(self, win: curses.window) -> bool:
-        """Callback for drawing the window"""# {{{
+        """Callback for drawing the window"""
         pv = self.padview
         assert same(pv.pad, win)
         win.erase()
@@ -73,44 +73,44 @@ class DebugPanel:
                 break
 
         pv.desired_view_size = (y, w)
-        return True# }}}
+        return True
 
     def on_update(self):
-        """Callback when enabled for updating after each keypress"""# {{{
+        """Callback when enabled for updating after each keypress"""
         if self.update_callback is not None:
             self.update_callback()
 
         tui.windraw_refresh(self.drawstate, self.padview)
-        self.stdwin.move_cursor(self.stdwin.stdcurs)# }}}
+        self.stdwin.move_cursor(self.stdwin.stdcurs)
 
     def track(self, key: str, value: Any):
-        """Add value or callable to map of tracked values"""# {{{
-        self.track_map[key] = value# }}}
+        """Add value or callable to map of tracked values"""
+        self.track_map[key] = value
 
     def untrack(self, key: str) -> Any:
-        """Remove and return tracked value"""# {{{
-        return self.track_map.pop(key) if key in self.track_map else None# }}}
+        """Remove and return tracked value"""
+        return self.track_map.pop(key) if key in self.track_map else None
 
     def enable(self):
-        """Enable the debug display"""# {{{
+        """Enable the debug display"""
         self.update_callback = self.stdwin.on_post_key
         self.stdwin.on_post_key = self.on_update
         self.is_visible = True
-        self.stdwin.refresh()# }}}
+        self.stdwin.refresh()
 
     def disable(self):
-        """Disable the debug display"""# {{{
+        """Disable the debug display"""
         self.stdwin.on_post_key = self.update_callback
         self.update_callback = None
         self.is_visible = False
-        self.stdwin.refresh()# }}}
+        self.stdwin.refresh()
 
     def toggle(self):
-        """Toggle the state of the debug display"""# {{{
+        """Toggle the state of the debug display"""
         if self.is_visible:
             self.disable()
         else:
-            self.enable()# }}}
+            self.enable()
 
 class MinesweeperApp:
     """Main application class for marshalling initialisation and program state"""
@@ -118,7 +118,7 @@ class MinesweeperApp:
                  "debug_panel")
 
     def __init__(self, stdwin: tui.MainWindow):
-        self.stdwin = stdwin# {{{
+        self.stdwin = stdwin
         self.event_handler = EventHandler()
         self.stdwin.on_post_key = self.event_handler.process
 
@@ -132,6 +132,8 @@ class MinesweeperApp:
         self.debug_panel = DebugPanel(self.stdwin)
         self.track_values()
 
+        self.game_logic.set_overlay_surface(self.overlay)
+
         self.stdwin.stdcurs.cursor = (-1, -1)
         self.game_logic.resize_drawing_surface()
         self.stdwin.refresh()
@@ -140,21 +142,21 @@ class MinesweeperApp:
         self.map_selection()
         self.game_logic.map_game_controls()
         self.game_logic.start_playing()
-        self.stdwin.mainloop() # }}}
+        self.stdwin.mainloop() 
 
     def on_resize(self):
-        """Callback for window resizing"""# {{{
+        """Callback for window resizing"""
         curses.update_lines_cols()
         self.game_logic.resize_drawing_surface()
-        self.stdwin.refresh()# }}}
+        self.stdwin.refresh()
 
     def on_reset(self):
-        """Callback for window reset/refresh"""# {{{
+        """Callback for window reset/refresh"""
         self.stdwin.stdscr.clear()
-        self.stdwin.refresh()# }}}
+        self.stdwin.refresh()
 
     def on_quit(self):
-        """Callback for the user quitting the program# {{{
+        """Callback for the user quitting the program
 
         Emits an event that may result in a confirmation dialog being
         displayed"""
@@ -170,14 +172,14 @@ class MinesweeperApp:
                 choice = 1,
                 default_height = get_grid_height(self.game_logic.grid.grid_size))
 
-        self.event_handler.enqueue(QuitEvent(confirm_dialog = quit_dialog))# }}}
+        self.event_handler.enqueue(QuitEvent(confirm_dialog = quit_dialog))
 
     def do_quit(self):
-        """Quit the mainloop"""# {{{
-        self.stdwin.quit()# }}}
+        """Quit the mainloop"""
+        self.stdwin.quit()
 
     def map_window(self):
-        """Map the application keys for controlling the window state, such as# {{{
+        """Map the application keys for controlling the window state, such as
         screen refreshing, debug capabilities and quitting
 
         By default, quitting is bound to MinesweeperApp.do_quit, which ends the
@@ -190,10 +192,10 @@ class MinesweeperApp:
 
         self.event_handler.bind(QuitEvent, lambda _: self.do_quit())
         self.stdwin.add_mapping(tui.askey("C-C"), self.on_quit)
-        self.stdwin.add_mapping(tui.askey("q"), self.on_quit)# }}}
+        self.stdwin.add_mapping(tui.askey("q"), self.on_quit)
 
     def map_selection(self):
-        """Map the directional keys to emit movement events"""# {{{
+        """Map the directional keys to emit movement events"""
         stdwin = self.stdwin
         event_handler = self.event_handler
         stdwin.add_mapping(tui.askey("k"),
@@ -223,10 +225,10 @@ class MinesweeperApp:
         stdwin.add_mapping(tui.askey("KEY_ENTER"),
                            partial(event_handler.enqueue, SelectEvent()))
         stdwin.add_mapping(tui.askey("C-J"),
-                           partial(event_handler.enqueue, SelectEvent()))# }}}
+                           partial(event_handler.enqueue, SelectEvent()))
 
     def track_values(self):
-        """Initialise the debug panel with tracked values"""# {{{
+        """Initialise the debug panel with tracked values"""
         self.debug_panel.track("cursor", lambda: self.stdwin.stdcurs)
         self.debug_panel.track("grid_coord", compose2(
             partial(getattr, self.game_logic, "selection"), label_xycoords))
@@ -237,10 +239,10 @@ class MinesweeperApp:
         self.debug_panel.track("pv_screen", compose2(
             partial(getattr, gameview_pv, "desired_screen_start"), label_yxcoords))
         self.debug_panel.track("pv_view", compose2(
-            partial(getattr, gameview_pv, "desired_view_size"), label_yxcoords)) # }}}
+            partial(getattr, gameview_pv, "desired_view_size"), label_yxcoords)) 
 
 def key_instruction_bar(stdwin: tui.MainWindow, event_handler: EventHandler) -> tui.TextWindow:
-    """Object for drawing key instructions"""# {{{
+    """Object for drawing key instructions"""
     window = curses.newwin(1, curses.COLS, curses.LINES - 1, 0)
     drawstate = tui.WindowDrawState(window)
 
@@ -258,10 +260,10 @@ def key_instruction_bar(stdwin: tui.MainWindow, event_handler: EventHandler) -> 
     return tui.TextWindow(
             stdwin,
             event_handler,
-            drawstate)# }}}
+            drawstate)
 
 def overlay(stdwin: tui.MainWindow, event_handler: EventHandler):
-    """Object for drawing dialogs overlaying the application"""# {{{
+    """Object for drawing dialogs overlaying the application"""
     window = curses.newpad(100, 100)
     padview = tui.PadView(window)
     drawstate = tui.WindowDrawState(window)
@@ -270,10 +272,10 @@ def overlay(stdwin: tui.MainWindow, event_handler: EventHandler):
             stdwin,
             event_handler,
             drawstate,
-            padview)# }}}
+            padview)
 
 def titlebar(stdwin: tui.MainWindow, event_handler: EventHandler):
-    """Object for drawing the application titlebar"""# {{{
+    """Object for drawing the application titlebar"""
     window = curses.newwin(1, curses.COLS, 0, 0)
     drawstate = tui.WindowDrawState(window)
 
@@ -289,9 +291,7 @@ def titlebar(stdwin: tui.MainWindow, event_handler: EventHandler):
     return tui.TextWindow(
             stdwin,
             event_handler,
-            drawstate)# }}}
+            drawstate)
 
 if __name__ == "__main__":
     curses.wrapper(tui.start_curses, init_curses, MinesweeperApp)
-
-# vim: foldmethod=marker
