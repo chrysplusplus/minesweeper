@@ -26,7 +26,7 @@ import terminal as term
 
 from dialog import MovementEvent, SelectEvent, Option, OptionsDialog
 from event import EventHandler
-from game import QuitEvent, GameView, empty_tile_grid, label_yxcoords, label_xycoords, \
+from game import QuitEvent, GameLogic, empty_tile_grid, label_yxcoords, label_xycoords, \
         get_grid_height
 from terminal import init_curses
 from util import same, compose2
@@ -114,7 +114,7 @@ class DebugPanel:
 
 class MinesweeperApp:
     """Main application class for marshalling initialisation and program state"""
-    __slots__ = ("stdwin", "event_handler", "gameview", "keyhelp", "overlay", "titlebar",
+    __slots__ = ("stdwin", "event_handler", "game_logic", "keyhelp", "overlay", "titlebar",
                  "debug_panel")
 
     def __init__(self, stdwin: tui.MainWindow):
@@ -122,7 +122,7 @@ class MinesweeperApp:
         self.event_handler = EventHandler()
         self.stdwin.on_post_key = self.event_handler.process
 
-        self.gameview = GameView(
+        self.game_logic = GameLogic(
                 stdwin = self.stdwin,
                 event_handler = self.event_handler,
                 grid = empty_tile_grid((10, 10), 15))
@@ -133,21 +133,19 @@ class MinesweeperApp:
         self.track_values()
 
         self.stdwin.stdcurs.cursor = (-1, -1)
-        self.gameview.resize()
-        self.gameview.focus_cursor()
+        self.game_logic.resize_drawing_surface()
         self.stdwin.refresh()
 
         self.map_window()
         self.map_selection()
-        self.gameview.starting_playing()
-        self.gameview.map_game_controls()
+        self.game_logic.map_game_controls()
+        self.game_logic.start_playing()
         self.stdwin.mainloop() # }}}
 
     def on_resize(self):
         """Callback for window resizing"""# {{{
         curses.update_lines_cols()
-        self.gameview.resize()
-        self.gameview.focus_cursor()
+        self.game_logic.resize_drawing_surface()
         self.stdwin.refresh()# }}}
 
     def on_reset(self):
@@ -170,7 +168,7 @@ class MinesweeperApp:
                     Option("Yes", self.do_quit),
                     Option("No", do_restore = True)],
                 choice = 1,
-                default_height = get_grid_height(self.gameview.grid.grid_size))
+                default_height = get_grid_height(self.game_logic.grid.grid_size))
 
         self.event_handler.enqueue(QuitEvent(confirm_dialog = quit_dialog))# }}}
 
@@ -231,9 +229,9 @@ class MinesweeperApp:
         """Initialise the debug panel with tracked values"""# {{{
         self.debug_panel.track("cursor", lambda: self.stdwin.stdcurs)
         self.debug_panel.track("grid_coord", compose2(
-            partial(getattr, self.gameview, "selection"), label_xycoords))
+            partial(getattr, self.game_logic, "selection"), label_xycoords))
 
-        gameview_pv = self.gameview.textwindow.padview
+        gameview_pv = self.game_logic.display.padview
         self.debug_panel.track("pv_pad", compose2(
             partial(getattr, gameview_pv, "pad_start"), label_yxcoords))
         self.debug_panel.track("pv_screen", compose2(

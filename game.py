@@ -125,91 +125,160 @@ class TileGrid:
             self._flags += 1# }}}
 
 class GameState(Enum):
-    """Enumeration of possible states for GameView"""
+    """Enumeration of possible states for GameLogic"""
     INITIALISING = auto()
     PLAYING = auto()
     WIN = auto()
     LOSE = auto()
 
-class GameView:
-    """Class for drawing the Minesweeper grid and handling game logic"""
-    __slots__ = ("textwindow", "selection", "state", "grid", "last_quit_callback")
+class GridDisplay:
+    """Handles drawing the tile grid"""
+    __slots__ = ("stdwin", "grid", "selection", "padview", "drawstate")
 
-    def __init__(self,
-                 stdwin: tui.MainWindow,
-                 event_handler: EventHandler,
-                 *,
-                 grid: TileGrid | None = None):
-        window = curses.newpad(100, 100)# {{{
-        padview = tui.PadView(window, desired_screen_start = (2, 0))
-        drawstate = tui.WindowDrawState(window)
-        drawstate.on_draw = self.on_game_draw
-        stdwin.add_child(drawstate, padview)
-
-        self.textwindow = tui.TextWindow(stdwin, event_handler, drawstate, padview)
-
-        self.selection = (0, 0)
-        self.state = GameState.INITIALISING
-        assert grid is not None
+    def __init__(self, stdwin: tui.MainWindow, grid: TileGrid):
+        self.stdwin = stdwin
         self.grid = grid
+        self.selection = (0, 0)
 
-        # TODO dialog handling class
-        self.last_quit_callback: Callable[[BaseEvent], None] | None = None# }}}
+        window = curses.newpad(100, 100)
+        self.padview = tui.PadView(window, desired_screen_start = (2, 0))
+        self.drawstate = tui.WindowDrawState(window)
+        self.stdwin.add_child(self.drawstate, self.padview)
 
-    def on_game_draw(self, win: curses.window) -> bool:
-        """Callback for drawing during normal gameplay"""# {{{
+        self.set_draw_callback(self.on_play_draw)
+
+    def on_play_draw(self, win: curses.window) -> bool:
+        """Callback for drawing during play state"""
         win.erase()
         self.draw_grid(win)
         self.update_mine_counter(win)
-        return True# }}}
+        return True
 
     def on_lose_draw(self, win: curses.window, *, lose_coords: tuple[int, int]) -> bool:
-        """Callback for drawing after losing the game"""# {{{
+        """Callback for drawing during lose state"""
         win.erase()
         self.draw_grid(win, lose_coords = lose_coords)
         win.addstr(get_grid_height(self.grid.grid_size), 0, "You lose!", term.ATTR_RED)
-        return True# }}}
+        return True
 
     def on_win_draw(self, win: curses.window) -> bool:
-        """Callback for drawing after winning the game"""# {{{
+        """Callback for drawing after winning the game"""
         win.erase()
         self.draw_grid(win)
         win.addstr(get_grid_height(self.grid.grid_size), 0, "You win!", term.ATTR_YELLOW)
-        return True# }}}
+        return True
+
+    def get_grid_selection_coords(self) -> tuple[int, int]:
+        """Return the coords of the current grid selection"""
+        return self.selection
+
+    def set_draw_callback(self, callback: Callable[[curses.window], bool])\
+            -> Callable[[curses.window], bool] | None:
+        """Set the draw callback for the display
+
+        Returns the old callback"""
+        old_callback, self.drawstate.on_draw = self.drawstate.on_draw, callback
+        return old_callback
+
+    def draw_grid(self, win: curses.window, **kwargs):
+        """Draw the grid to the window
+
+        kwargs:
+            loords_coords: tuple[int, int]"""
+        lose_coords = kwargs.get("lose_coords")
+        tui.win_addlines(win, gridlines(self.grid))
+        for coords, _ in self.grid:
+            symbol = get_symbol_for_coord_from(self.grid, coords)
+            if symbol is not None and coords == lose_coords:
+                win.addch(*scale_grid_coords_to_screen_offset(coords), symbol, term.ATTR_RED)
+            elif symbol is not None:
+                win.addch(*scale_grid_coords_to_screen_offset(coords), symbol)
+
+    def mark_tile_at(self, coords: tuple[int, int]):
+        """Mark the tile at the specified coords to be updated on the next
+        refresh call"""
+        w, h = self.grid.grid_size
+        x, y = coords
+        assert 0 <= x < w and 0 <= y < h
+        symbol = get_symbol_for_coord_from(self.grid, coords)
+        symbol = ' ' if symbol is None else symbol
+        self.drawstate.win.addch(*scale_grid_coords_to_screen_offset(coords), symbol)
+
+    def toggle_flag_at_selection(self):
+        """Toggle the flag on the selected tile"""
+        old_tile = self.grid.get_tile(self.selection)
+        if Tile.SEEN in old_tile:
+            return
+
+        new_tile = old_tile ^ Tile.FLAG
+        self.grid.set_tile(self.selection, new_tile)
+        self.mark_tile_at(self.selection)
+        self.update_mine_counter(self.drawstate.win)
+        self.refresh()
+
+    def focus_cursor(self):
+        """Focus screen cursor to grid selection"""
+        self.stdwin.stdcurs = get_grid_view_screen_cursor(self.padview, self.selection)
+        self.stdwin.move_cursor(self.stdwin.stdcurs)
+
+    def move_selection_relative(self, dx: int, dy: int):
+        """Move the grid cursor by relative coordinates"""
+        x, y = self.selection
+        self.selection = wrap_coords_to_grid((x + dx, y + dy), self.grid.grid_size)
+        self.focus_cursor()
+
+    def update_mine_counter(self, win: curses.window):
+        """Update the mine counter line"""
+        status_line_y = get_grid_height(self.grid.grid_size)
+        tui.win_clear_line(win, status_line_y)
+        win.addstr(status_line_y, 0, f'Mines left: {self.grid.mines}', term.ATTR_CYAN)
+
+    def resize(self):
+        """Resize the drawing surface to fill the available space"""
+        height, width = scale_grid_coords_to_screen_offset(self.grid.grid_size)
+        width = width - 1
+        width = clamp(width, curses.COLS - 3)
+        height = clamp(height, curses.LINES - 4)
+        starty = 2
+        startx = (curses.COLS - width) // 2
+        self.padview.desired_screen_start = (starty, startx)
+        self.padview.desired_view_size = (height, width)
+
+    def refresh(self):
+        """Update the window with any marked tiles"""
+        self.drawstate.win.refresh(*tui.padview_clamp(self.padview))
+        self.focus_cursor()
+
+    def redraw(self):
+        """Redraw the whole surface"""
+        tui.windraw_refresh(self.drawstate, self.padview)
+
+class GameLogic:
+    """Handles game controls and logic"""
+    __slots__ = ("stdwin", "event_handler", "display", "state", "grid")
+
+    def __init__(self, stdwin: tui.MainWindow, event_handler: EventHandler, grid: TileGrid):
+        self.stdwin = stdwin
+        self.event_handler = event_handler
+        self.display = GridDisplay(stdwin, grid)
+        self.grid = grid
+        self.state = GameState.INITIALISING
 
     def on_grid_selection_changed(self, e: MovementEvent):
-        """Callback for updating grid selection"""# {{{
-        stdwin = self.textwindow.stdwin
-        self.selection = wrap_coords_to_grid(
-                e.get_moved_coords_from(self.selection), self.grid.grid_size)
-        stdwin.stdcurs = get_grid_view_screen_cursor(self.textwindow.padview, self.selection)
-        stdwin.move_cursor(stdwin.stdcurs)# }}}
+        """Callback for updating grid selection"""
+        if not e.relative:
+            raise NotImplementedError("Absolute grid motions not implemented")
+        self.display.move_selection_relative(e.x, e.y)
 
     def on_select(self, _):
-        """Callback for activating current selection"""# {{{
+        """Callback for activating current selection"""
         if self.grid.empty():
             self.grid.populate_except_for(
-                    *iter_3x3_area_coords(self.grid.grid_size, self.selection))
+                    *iter_3x3_area_coords(self.grid.grid_size, self.display.selection))
 
-        self.reveal_tile_at(self.selection)
-        tui.windraw_refresh(self.textwindow.drawstate, self.textwindow.padview)
-        self.textwindow.stdwin.move_cursor(self.textwindow.stdwin.stdcurs)# }}}
-
-    def on_flag(self, _):
-        """Callback for toggling flag at the current grid selection"""# {{{
-        # TODO fix visual bug when deleting unicode flag symbol
-        if self.grid.empty():
-            return
-
-        tile = self.grid.get_tile(self.selection)
-        if Tile.SEEN in tile:
-            return
-
-        tile ^= Tile.FLAG
-        self.grid.set_tile(self.selection, tile)
-        self.mark_tile_at(self.selection)
-        self.update_mine_counter(self.textwindow.window)
-        self.refresh()# }}}
+        self.reveal_tile_at(self.display.selection)
+        self.display.redraw()
+        self.display.focus_cursor()
 
     def on_lose(self, e: GameLoseEvent):
         """Callback for losing the game"""# {{{
@@ -217,25 +286,24 @@ class GameView:
         self.state = GameState.LOSE
         self.unbind_game_events()
         self.reveal_all_mines()
-        self.textwindow.drawstate.on_draw = partial(self.on_lose_draw, lose_coords = lose_coords)
-        tui.windraw_refresh(self.textwindow.drawstate, self.textwindow.padview)
-        self.textwindow.stdwin.move_cursor(self.textwindow.stdwin.stdcurs)# }}}
+        self.display.set_draw_callback(
+                partial(self.display.on_lose_draw, lose_coords = lose_coords))
+        self.display.redraw()
 
     def on_win(self, _):
         """Callback for winning the game"""# {{{
         self.state = GameState.WIN
         self.unbind_game_events()
-        self.textwindow.drawstate.on_draw = self.on_win_draw
-        tui.windraw_refresh(self.textwindow.drawstate, self.textwindow.padview)
-        self.textwindow.stdwin.move_cursor(self.textwindow.stdwin.stdcurs)# }}}
+        self.display.set_draw_callback(self.display.on_win_draw)
+        self.display.redraw()
 
     def on_quit(self, e: QuitEvent):
         """Callback for the user quitting, display confirmation dialog if# {{{
         one is provided"""
         if e.confirm_dialog is None:
-            self.textwindow.stdwin.quit()
+            self.stdwin.quit()
         else:
-            self.textwindow.event_handler.enqueue(OpenDialogEvent(e.confirm_dialog))# }}}
+            self.event_handler.enqueue(OpenDialogEvent(e.confirm_dialog))# }}}
 
     def on_open_dialog(self, e: OpenDialogEvent):
         """Callback for opening a dialog box"""# {{{
@@ -250,7 +318,7 @@ class GameView:
         dialog = e.dialog
         dialog.textwindow.drawstate.on_draw = dialog.on_draw
         dialog.bind_events()
-        dialog.textwindow.stdwin.refresh()# }}}
+        self.stdwin.refresh()# }}}
 
     def on_restore_from_dialog(self, e: DialogRestoreEvent):
         """Callback for restoring from a closing dialog box"""# {{{
@@ -265,10 +333,10 @@ class GameView:
         dialog.textwindow.drawstate.win.erase()
         dialog.textwindow.padview.desired_screen_start = (0, 0)
         dialog.textwindow.padview.desired_view_size = (0, 0)
-        self.textwindow.stdwin.refresh()
-        self.focus_cursor()# }}}
+        self.stdwin.refresh()
+        self.display.focus_cursor()# }}}
 
-    def starting_playing(self):
+    def start_playing(self):
         """Bind events to start playing the minesweeper game"""# {{{
         self.bind_movement_events()
         self.bind_game_events()
@@ -277,66 +345,51 @@ class GameView:
 
     def bind_movement_events(self):
         """Bind movement events"""# {{{
-        self.textwindow.event_handler.bind(MovementEvent, self.on_grid_selection_changed)# }}}
+        self.event_handler.bind(MovementEvent, self.on_grid_selection_changed)# }}}
 
     def unbind_movement_events(self):
         """Unbind movement events# {{{
 
         Return False if movement events are currently inactive"""
-        self.textwindow.event_handler.unbind(MovementEvent)# }}}
+        self.event_handler.unbind(MovementEvent)# }}}
 
     def bind_game_events(self):
         """Bind game events"""# {{{
-        self.textwindow.event_handler.bind(SelectEvent, self.on_select)
-        self.textwindow.event_handler.bind(PlaceFlagEvent, self.on_flag)
-        self.textwindow.event_handler.bind(GameLoseEvent, self.on_lose)
-        self.textwindow.event_handler.bind(GameWinEvent, self.on_win)# }}}
+        self.event_handler.bind(SelectEvent, self.on_select)
+        self.event_handler.bind(PlaceFlagEvent, lambda _: self.display.toggle_flag_at_selection())
+        self.event_handler.bind(GameLoseEvent, self.on_lose)
+        self.event_handler.bind(GameWinEvent, self.on_win)# }}}
 
     def unbind_game_events(self):
         """Unbind game events# {{{
 
         Return False if game events are not currently active"""
-        self.textwindow.event_handler.unbind(SelectEvent)
-        self.textwindow.event_handler.unbind(PlaceFlagEvent)
-        self.textwindow.event_handler.unbind(GameLoseEvent)
-        self.textwindow.event_handler.unbind(GameWinEvent)# }}}
+        self.event_handler.unbind(SelectEvent)
+        self.event_handler.unbind(PlaceFlagEvent)
+        self.event_handler.unbind(GameLoseEvent)
+        self.event_handler.unbind(GameWinEvent)# }}}
 
-    def bind_dialog_events(self):
-        """Bind dialog handling events"""# {{{
-        self.last_quit_callback = self.textwindow.event_handler.rebind(QuitEvent, self.on_quit)
-        self.textwindow.event_handler.bind(OpenDialogEvent, self.on_open_dialog)
-        self.textwindow.event_handler.bind(DialogRestoreEvent, self.on_restore_from_dialog)# }}}
+    def bind_dialog_events(self) -> Callable[[BaseEvent], None] | None:
+        """Bind dialog handling events
 
-    def unbind_dialog_events(self):
+        Returns the last quit callback for restoring later"""
+        last_quit_callback = self.event_handler.rebind(QuitEvent, self.on_quit)
+        self.event_handler.bind(OpenDialogEvent, self.on_open_dialog)
+        self.event_handler.bind(DialogRestoreEvent, self.on_restore_from_dialog)
+        return last_quit_callback
+
+    def unbind_dialog_events(self, next_quit_callback: Callable[[BaseEvent], None]):
         """Unbind dialog handling events# {{{
 
         Return False if dialog handling events are not currently active"""
-        if self.last_quit_callback is not None:
-            self.textwindow.event_handler.rebind(QuitEvent, self.last_quit_callback)
-        self.textwindow.event_handler.unbind(OpenDialogEvent)
-        self.textwindow.event_handler.unbind(DialogRestoreEvent)# }}}
+        self.event_handler.rebind(QuitEvent, next_quit_callback)
+        self.event_handler.unbind(OpenDialogEvent)
+        self.event_handler.unbind(DialogRestoreEvent)
 
-    def draw_grid(self, win: curses.window, *, lose_coords: tuple[int, int] | None = None):
-        """Draw the grid to the window"""# {{{
-        tui.win_addlines(win, gridlines(self.grid))
-
-        for coords, _ in self.grid:
-            symbol = get_symbol_for_coord_from(self.grid, coords)
-            if symbol is not None and coords == lose_coords:
-                win.addch(*scale_grid_coords_to_screen_offset(coords), symbol, term.ATTR_RED)
-            elif symbol is not None:
-                win.addch(*scale_grid_coords_to_screen_offset(coords), symbol)# }}}
-
-    def resize(self):
-        """Resize the window view to fill the available space"""# {{{
-        height, width = scale_grid_coords_to_screen_offset(self.grid.grid_size)
-        width = width - 1
-        width = clamp(width, curses.COLS - 3)
-        height = clamp(height, curses.LINES - 4)
-        starty = 2
-        startx = (curses.COLS - width) // 2
-        self.textwindow.padview.desired_screen_start = (starty, startx)
-        self.textwindow.padview.desired_view_size = (height, width)# }}}
+    def resize_drawing_surface(self):
+        """Resize the drawing surface"""
+        self.display.resize()
+        self.display.focus_cursor()
 
     def reveal_tile_at(self, coords: tuple[int, int]):
         """Reveal the tile at the specified coord"""# {{{
@@ -346,10 +399,10 @@ class GameView:
 
         tile |= Tile.SEEN
         self.grid.set_tile(coords, tile)
-        self.mark_tile_at(coords)
+        self.display.mark_tile_at(coords)
 
         if Tile.MINE in tile:
-            self.textwindow.event_handler.enqueue(GameLoseEvent(coords))
+            self.event_handler.enqueue(GameLoseEvent(coords))
             return
 
         neighbour_coords = list(iter_3x3_area_coords(self.grid.grid_size, coords))
@@ -360,58 +413,30 @@ class GameView:
 
         n_remaining_empty_tiles = sum(Tile.EMPTY in t and Tile.SEEN not in t for _, t in self.grid)
         if n_remaining_empty_tiles == 0:
-            self.textwindow.event_handler.enqueue(GameWinEvent())
+            self.event_handler.enqueue(GameWinEvent())
             return# }}}
 
     def reveal_all_mines(self):
         """Reveal all the mines in the grid"""# {{{
-        grid_changes = [(coords, tile | Tile.TRANS)
-                        for coords, tile in self.grid
-                        if Tile.MINE in tile]
+        grid_changes = [
+                (coords, tile | Tile.TRANS)
+                for coords, tile in self.grid
+                if Tile.MINE in tile]
 
         for coords, tile in grid_changes:
             self.grid.set_tile(coords, tile)
-            self.mark_tile_at(coords)# }}}
-
-    def focus_cursor(self):
-        """Focus screen cursor to grid selection"""# {{{
-        # TODO check if gameview has focus
-        stdwin = self.textwindow.stdwin
-        stdwin.stdcurs = get_grid_view_screen_cursor(self.textwindow.padview, self.selection)
-        stdwin.move_cursor(stdwin.stdcurs)# }}}
-
-    def mark_tile_at(self, coords: tuple[int, int]):
-        """Mark the tile at the specified coords to be updated on the next refresh"""# {{{
-        w, h = self.grid.grid_size
-        x, y = coords
-        assert 0 <= x < w and 0 <= y < h
-        symbol = get_symbol_for_coord_from(self.grid, coords)
-        symbol = ' ' if symbol is None else symbol
-        self.textwindow.window.addch(*scale_grid_coords_to_screen_offset(coords), symbol)# }}}
-
-    def update_mine_counter(self, win: curses.window):
-        """Update the mine counter line"""# {{{
-        status_line_y = get_grid_height(self.grid.grid_size)
-        tui.win_clear_line(win, status_line_y)
-        win.addstr(status_line_y, 0, f'Mines left: {self.grid.mines}',
-                   term.ATTR_CYAN)# }}}
-
-    def refresh(self):
-        """Update the window with any marked tiles"""# {{{
-        self.textwindow.window.refresh(*tui.padview_clamp(self.textwindow.padview))
-        self.textwindow.stdwin.move_cursor(self.textwindow.stdwin.stdcurs)# }}}
+            self.display.mark_tile_at(coords)# }}}
 
     def map_game_controls(self):
-        """Map keys for game controls"""# {{{
-        stdwin = self.textwindow.stdwin
-        event_handler = self.textwindow.event_handler
-        stdwin.add_mapping(tui.askey(" "), partial(event_handler.enqueue, SelectEvent()))
-        stdwin.add_mapping(tui.askey("f"), partial(event_handler.enqueue, PlaceFlagEvent()))# }}}
+        """Map keys for game controls"""
+        self.stdwin.add_mapping(tui.askey(" "), lambda: self.event_handler.enqueue(SelectEvent()))
+        self.stdwin.add_mapping(
+                tui.askey("f"), lambda: self.event_handler.enqueue(PlaceFlagEvent()))
 
     def unmap_game_controls(self):
-        """Remove mappings for game controls"""# {{{
-        self.textwindow.stdwin.remove_mapping(tui.askey(" "))
-        self.textwindow.stdwin.remove_mapping(tui.askey("f"))# }}}
+        """Remove mappings for game controls"""
+        self.stdwin.remove_mapping(tui.askey(" "))
+        self.stdwin.remove_mapping(tui.askey("f"))
 
 def empty_tile_grid(grid_size: tuple[int, int], mines: int) -> TileGrid:
     """Create an empty grid"""# {{{
