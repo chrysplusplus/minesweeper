@@ -24,6 +24,7 @@ from typing import Any
 import tui
 import terminal as term
 
+from config import load_default_config
 from dialog import MovementEvent, SelectEvent, Option, OptionsDialog
 from event import EventHandler
 from game import QuitEvent, GameLogic, empty_tile_grid, label_yxcoords, label_xycoords, \
@@ -115,17 +116,20 @@ class DebugPanel:
 class MinesweeperApp:
     """Main application class for marshalling initialisation and program state"""
     __slots__ = ("stdwin", "event_handler", "game_logic", "keyhelp", "overlay", "titlebar",
-                 "debug_panel")
+                 "debug_panel", "config")
 
     def __init__(self, stdwin: tui.MainWindow):
         self.stdwin = stdwin
         self.event_handler = EventHandler()
         self.stdwin.on_post_key = self.event_handler.process
 
+        self.config = load_default_config()
+
         self.game_logic = GameLogic(
                 stdwin = self.stdwin,
                 event_handler = self.event_handler,
-                grid = empty_tile_grid((10, 10), 15))
+                grid = empty_tile_grid((10, 10), 15),
+                config = self.config)
         self.keyhelp = key_instruction_bar(self.stdwin, self.event_handler)
         self.overlay = overlay(self.stdwin, self.event_handler)
         self.titlebar = titlebar(self.stdwin, self.event_handler)

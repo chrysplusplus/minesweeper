@@ -1,0 +1,3 @@
+[game]
+# Set the bombs and flag symbols to use unicode emojis
+use_unicode_symbols = false

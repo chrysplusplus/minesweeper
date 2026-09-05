@@ -6,6 +6,7 @@ Module for handling game and game display logic"""
 
 import curses
 
+from collections import namedtuple
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, KW_ONLY
 from enum import Flag, auto, Enum
@@ -16,6 +17,7 @@ from random import shuffle
 import tui
 import terminal as term
 
+from config import Config
 from dialog import MovementEvent, SelectEvent, QuitEvent, OpenDialogEvent, DialogRestoreEvent,\
         DialogLike, Option, OptionsDialog
 from event import BaseEvent, EventHandler
@@ -139,11 +141,13 @@ class GameState(Enum):
     WIN = auto()
     LOSE = auto()
 
+TileMap = namedtuple("TileMap", "flag mine")
+
 class GridDisplay:
     """Handles drawing the tile grid"""
-    __slots__ = ("stdwin", "grid", "selection", "padview", "drawstate")
+    __slots__ = ("stdwin", "grid", "selection", "padview", "drawstate", "tilemap")
 
-    def __init__(self, stdwin: tui.MainWindow, grid: TileGrid):
+    def __init__(self, stdwin: tui.MainWindow, grid: TileGrid, config: Config):
         self.stdwin = stdwin
         self.grid = grid
         self.selection = (0, 0)
@@ -152,6 +156,8 @@ class GridDisplay:
         self.padview = tui.PadView(window, desired_screen_start = (2, 0))
         self.drawstate = tui.WindowDrawState(window)
         self.stdwin.add_child(self.drawstate, self.padview)
+
+        self.tilemap = select_tilemap_from_config(config)
 
         self.set_draw_callback(self.on_play_draw)
 
@@ -203,7 +209,7 @@ class GridDisplay:
         lose_coords = kwargs.get("lose_coords")
         tui.win_addlines(win, gridlines(self.grid))
         for coords, _ in self.grid:
-            symbol = get_symbol_for_coord_from(self.grid, coords)
+            symbol = get_symbol_for_coord_from(self. tilemap, self.grid, coords)
             if symbol is not None and coords == lose_coords:
                 win.addch(*scale_grid_coords_to_screen_offset(coords), symbol, term.ATTR_RED)
             elif symbol is not None:
@@ -216,10 +222,11 @@ class GridDisplay:
         w, h = self.grid.grid_size
         x, y = coords
         assert 0 <= x < w and 0 <= y < h
-        symbol = get_symbol_for_coord_from(self.grid, coords)
+        symbol = get_symbol_for_coord_from(self. tilemap, self.grid, coords)
         symbol = ' ' if symbol is None else symbol
         self.drawstate.win.addch(*scale_grid_coords_to_screen_offset(coords), symbol)
 
+    # TODO fix regression crash when placing a flag on uninitialised grid
     def toggle_flag_at_selection(self):
         """Toggle the flag on the selected tile"""
         old_tile = self.grid.get_tile(self.selection)
@@ -283,11 +290,12 @@ class GameLogic:
     def __init__(self,
                  stdwin: tui.MainWindow,
                  event_handler: EventHandler,
-                 grid: TileGrid):
+                 grid: TileGrid,
+                 config: Config):
         self.stdwin = stdwin
         self.event_handler = event_handler
         self.overlay: tui.TextWindow | None = None
-        self.display = GridDisplay(stdwin, grid)
+        self.display = GridDisplay(stdwin, grid, config)
         self.grid = grid
         self.state = GameState.INITIALISING
         self.end_counter = 0
@@ -676,17 +684,18 @@ def count_neighbouring_mines(grid: TileGrid, coords: tuple[int, int]) -> int:
     specified grid"""
     return sum(Tile.MINE in t for t in iter_grid_neighbours(grid, coords))
 
-def get_symbol_for_coord_from(grid: TileGrid, coords: tuple[int, int]) -> str | None:
+def get_symbol_for_coord_from(
+        tilemap: TileMap, grid: TileGrid, coords: tuple[int, int]) -> str | None:
     """Determine display symbol for grid coordinates"""
     tile = grid.get_tile(coords)
     symbol: str | None = None
     # TODO add setting to change these to ASCII symbols
     if Tile.MINE in tile and Tile.SEEN in tile:
-        symbol = '💣'
+        symbol = tilemap.mine
     elif Tile.MINE in tile and Tile.TRANS in tile:
-        symbol = '💣'
+        symbol = tilemap.mine
     elif Tile.FLAG in tile:
-        symbol = '🚩'
+        symbol = tilemap.flag
     elif Tile.SEEN not in tile:
         symbol = None
     else:
@@ -718,5 +727,13 @@ def get_grid_height(grid_size: tuple[int, int]) -> int:
     """Calculate height of grid in window from its grid size"""
     _, height = grid_size
     return 2 * height + 1
+
+def select_tilemap_from_config(config: Config) -> TileMap:
+    """Select tilemap from config settings"""
+    use_unicode_symbols = config.get("game.use_unicode_symbols", False)
+    if use_unicode_symbols:
+        return TileMap(flag = "🚩", mine = "💣")
+    else:
+        return TileMap(flag = "f", mine = "x")
 
 # vim: foldmethod=indent foldnestmax=2 foldlevel=2
