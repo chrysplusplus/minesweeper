@@ -1,5 +1,7 @@
 # Minesweeper
 
+![screenshot](https://raw.githubusercontent.com/chrysplusplus/minesweeper/c342a8c9dd3a946d54255bdb2bb02dee6f779d22/.github/screenshot.png)
+
 Minesweeper for your terminal.
 
 ## Installation (Windows)
