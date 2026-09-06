@@ -6,7 +6,7 @@ Minesweeper for your terminal.
 
 ## Installation (Windows)
 
-1. Install the prerequisitve Python curses library with:
+1. Install the prerequisite Python curses library with:
 
     `pip install windows-curses`
 
