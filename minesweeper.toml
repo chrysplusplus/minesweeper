@@ -1,3 +1,9 @@
 [game]
 # Set the bombs and flag symbols to use unicode emojis
 use_unicode_symbols = false
+
+[grid]
+# Set the grid size and number of mines
+width = 10
+height = 10
+mines = 15

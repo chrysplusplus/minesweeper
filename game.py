@@ -55,6 +55,11 @@ class Tile(Flag):
     SEEN  = auto()
     TRANS = auto()
 
+@dataclass(slots = True)
+class GridConfig:
+    size: tuple[int, int]
+    mines: int
+
 class TileGrid:
     """Class representing grid of tiles"""
     __slots__ = ("_grid", "_grid_size", "_mines", "_flags")
@@ -285,18 +290,19 @@ class GridDisplay:
 
 class GameLogic:
     """Handles game controls and logic"""
-    __slots__ = ("stdwin", "event_handler", "overlay", "display", "state", "grid", "end_counter")
+    __slots__ = ("stdwin", "event_handler", "overlay", "display", "state", "grid_config", "grid",
+                 "end_counter")
 
     def __init__(self,
                  stdwin: tui.MainWindow,
                  event_handler: EventHandler,
-                 grid: TileGrid,
                  config: Config):
         self.stdwin = stdwin
         self.event_handler = event_handler
         self.overlay: tui.TextWindow | None = None
-        self.display = GridDisplay(stdwin, grid, config)
-        self.grid = grid
+        self.grid_config = extract_grid_config(config)
+        self.grid = empty_tile_grid_from_config(self.grid_config)
+        self.display = GridDisplay(stdwin, self.grid, config)
         self.state = GameState.INITIALISING
         self.end_counter = 0
 
@@ -408,7 +414,7 @@ class GameLogic:
         if self.state is GameState.INITIALISING:
             return
 
-        new_grid = empty_tile_grid(self.grid.grid_size, self.grid.get_total_mines())
+        new_grid = empty_tile_grid_from_config(self.grid_config)
         self.grid = new_grid
         self.end_counter = 0
         self.display.set_grid(new_grid)
@@ -532,9 +538,16 @@ class GameLogic:
         self.stdwin.remove_mapping(tui.askey(" "))
         self.stdwin.remove_mapping(tui.askey("f"))
 
-def empty_tile_grid(grid_size: tuple[int, int], mines: int) -> TileGrid:
+def extract_grid_config(config: Config) -> GridConfig:
+    """Extract grid configuration from app configuration"""
+    width = config.get("grid.width")
+    height = config.get("grid.height")
+    mines = config.get("grid.mines")
+    return GridConfig((width, height), mines)
+
+def empty_tile_grid_from_config(config: GridConfig) -> TileGrid:
     """Create an empty grid"""
-    return TileGrid([], grid_size, mines)
+    return TileGrid([], config.size, config.mines)
 
 def iter_conds_from_tiles(tiles: Iterable[Tile]) -> Iterable[bool]:
     """Return an iterator of barrier conditions for a collection of tiles"""

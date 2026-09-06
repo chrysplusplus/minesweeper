@@ -27,8 +27,7 @@ import terminal as term
 from config import load_default_config
 from dialog import MovementEvent, SelectEvent, Option, OptionsDialog
 from event import EventHandler
-from game import QuitEvent, GameLogic, empty_tile_grid, label_yxcoords, label_xycoords, \
-        get_grid_height
+from game import QuitEvent, GameLogic, label_yxcoords, label_xycoords, get_grid_height
 from terminal import init_curses
 from util import same, compose2
 
@@ -128,7 +127,6 @@ class MinesweeperApp:
         self.game_logic = GameLogic(
                 stdwin = self.stdwin,
                 event_handler = self.event_handler,
-                grid = empty_tile_grid((10, 10), 15),
                 config = self.config)
         self.keyhelp = key_instruction_bar(self.stdwin, self.event_handler)
         self.overlay = overlay(self.stdwin, self.event_handler)
